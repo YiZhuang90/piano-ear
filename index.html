@@ -40,15 +40,15 @@ h1{font-size:clamp(30px,5vw,44px);line-height:1.05;letter-spacing:-.02em;font-we
 .lyric{position:absolute;left:10px;top:8px;font-size:14px;color:#c9c6bf;right:10px}
 .fg{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#141518;color:#fff;font-size:13px;font-style:normal}
 .blk.now .fg{background:#fff;color:var(--felt)}
-.handov{position:absolute;left:0;right:0;top:0;bottom:-48px;pointer-events:none;z-index:3}
+.handov{position:absolute;left:0;right:0;top:0;bottom:-66px;pointer-events:none;z-index:3}
 .handov[hidden]{display:none}
-.fgr{position:absolute;top:calc((100% - 48px) * var(--tip));bottom:22px;width:calc(100%/var(--nw)*0.56);transform:translateX(-50%) rotate(var(--rot,0deg));transform-origin:50% 100%;border-radius:999px 999px 12px 12px;background:rgba(240,196,160,.34);border:1.5px solid rgba(255,236,218,.75);display:flex;justify-content:center;padding-top:5px;box-sizing:border-box;transition:left .35s,background .15s}
+.fgr{position:absolute;top:calc((100% - 66px) * var(--tip));bottom:34px;width:calc(100%/var(--nw)*0.66);transform:translateX(-50%) rotate(var(--rot,0deg));transform-origin:50% 100%;border-radius:999px 999px 12px 12px;background:rgba(232,180,140,.58);border:1.5px solid rgba(255,236,218,.9);box-shadow:0 2px 6px rgba(0,0,0,.25);display:flex;justify-content:center;padding-top:5px;box-sizing:border-box;transition:left .35s,background .15s}
 .fgr i{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:rgba(20,21,24,.72);color:#fff;font:700 12px/1 "Noto Sans SC",sans-serif;font-style:normal}
 .fgr.on{background:rgba(200,16,46,.62);border-color:#fff}
 .fgr.on i{background:#fff;color:var(--felt)}
 .fgr.pr{background:rgba(22,133,90,.7)}
-.palm{position:absolute;bottom:0;height:44px;border-radius:22px 22px 14px 14px;background:rgba(240,196,160,.28);border:1.5px solid rgba(255,236,218,.6);border-top:0;transition:left .35s;color:#f1efe9;font-size:12px;display:grid;place-items:center;box-sizing:border-box}
-.kb.withhand{margin-bottom:48px}
+.palm{position:absolute;bottom:0;height:46px;border-radius:14px 14px 22px 22px;background:rgba(232,180,140,.58);border:1.5px solid rgba(255,236,218,.9);border-top:0;transition:left .35s;color:#f1efe9;font-size:12px;display:grid;place-items:center;box-sizing:border-box}
+.kb.withhand{margin-bottom:66px}
 .shift{color:#f6c344}
 .felt{height:6px;background:var(--felt);margin:0 -2px}
 .kb{position:relative;display:flex;height:clamp(130px,22vw,190px);user-select:none;-webkit-user-select:none;touch-action:manipulation}
@@ -339,7 +339,7 @@ SONGS.forEach(sg => {
 });
 // 右手投影在键盘上：五个指尖落在当前手位的五个白键上（右手：拇指在左，小指在右）
 let hand = { anchor: null };
-const TIP = [0.80, 0.60, 0.53, 0.58, 0.68], ROT = [-14, -3, 0, 3, 7];
+const TIP = [0.74, 0.63, 0.61, 0.63, 0.68], ROT = [-22, -4, 0, 3, 7];
 function drawHand(anchor, finger) {
   const ov = $('handov');
   if (anchor === null || anchor === undefined) { ov.hidden = true; kb.classList.remove('withhand'); hand.anchor = null; return; }
@@ -348,13 +348,13 @@ function drawHand(anchor, finger) {
   if (!ov.children.length) ov.innerHTML = [1, 2, 3, 4, 5].map(f => `<div class="fgr" data-f="${f}"><i>${f}</i></div>`).join('') + '<div class="palm">右手</div>';
   ov.querySelectorAll('.fgr').forEach(el => {
     const f = +el.dataset.f, k = anchor + f - 1;
-    el.style.left = ((k + 0.5) * W + (f === 1 ? -W * 0.08 : 0)) + '%';
+    el.style.left = ((k + 0.5) * W) + '%';
     el.style.setProperty('--tip', TIP[f - 1]); el.style.setProperty('--rot', ROT[f - 1] + 'deg');
     el.classList.toggle('on', f === finger);
     el.hidden = k < 0 || k >= NW;
   });
   const pm = ov.querySelector('.palm');
-  pm.style.left = ((anchor + 0.25) * W) + '%'; pm.style.width = (4.5 * W) + '%';
+  pm.style.left = ((anchor + 0.55) * W) + '%'; pm.style.width = (4.25 * W) + '%';
 }
 function pressFinger(m) {
   if (hand.anchor === null) return;
