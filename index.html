@@ -106,7 +106,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="wrap">
 <div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 5 版</span></h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 6 版</span></h1>
   <div class="row" style="align-items:center">
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
     <button class="btn main" id="startBtn" type="button">开始听</button>
@@ -548,7 +548,7 @@ function startMic() {
 function diag(t) {
   let perm = '';
   const base = '安全连接 ' + (window.isSecureContext ? '是' : '否') + '；mediaDevices ' + (navigator.mediaDevices ? '有' : '无') + '；getUserMedia ' + (navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? '有' : '无') + '；AudioContext ' + (window.AudioContext || window.webkitAudioContext ? '有' : '无');
-  const show = () => { $('diag').textContent = '第 5 版。' + t + '。' + base + perm + '。' + navigator.userAgent; };
+  const show = () => { $('diag').textContent = '第 6 版。' + t + '。' + base + perm + '。' + navigator.userAgent; };
   show();
   try { navigator.permissions.query({ name: 'microphone' }).then(r => { perm = '；麦克风权限 ' + r.state; show(); }, () => {}); } catch (e) {}
 }
@@ -598,8 +598,8 @@ if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) micFail(NO_
 <script type="module">
 // 3D 绑骨右手：hand3d/piano-hand.js + right-hand.glb。WebGL 或网络不行就继续用 2D 手。
 const host = window.__hand3dHost;
-if (host && !host.off) import('./hand3d/piano-hand.js')
-  .then(({ PianoHand }) => PianoHand.create({ container: host.container(), whiteKeys: host.whiteKeys, keyboardHeight: host.keyboardHeight }))
+if (host && !host.off) import('./hand3d/piano-hand.js?v=6')
+  .then(({ PianoHand }) => PianoHand.create({ container: host.container(), whiteKeys: host.whiteKeys, keyboardHeight: host.keyboardHeight, glbUrl: './hand3d/right-hand.glb?v=6' }))
   .then(h => host.attach(h))
   .catch(e => console.warn('3D 手没有加载，用 2D 手：', e));
 </script>

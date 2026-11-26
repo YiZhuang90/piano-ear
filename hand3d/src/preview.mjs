@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PNG } from 'pngjs';
-import { HandRig } from './piano-hand.js';
+import { HandRig } from '../dist/piano-hand.js';
 
 const [glbPath, outPath, anchorArg, ...acts] = process.argv.slice(2);
 const buf = fs.readFileSync(glbPath);
@@ -13,7 +13,7 @@ const rig = new HandRig(gltf.scene, JSON.parse(process.env.POSE || '{}'));
 const NW = 12, LOW = 53, HIGH = 72, WHITE = [0, 2, 4, 5, 7, 9, 11];
 const env = process.env;
 const kbW = +(env.KBW || 351), kbH = +(env.KBH || 130), extra = +(env.EXTRA || 66), SS = 3;
-const s = kbW / NW, tilt = Math.acos(Math.min(0.87, Math.max(0.5, kbH / (s * 5.6)))), L = kbH / (s * Math.cos(tilt));
+const s = kbW / NW, tilt = Math.acos(Math.min(0.87, Math.max(0.5, kbH / (s * +(env.PREFL || 6.4))))), L = kbH / (s * Math.cos(tilt));
 rig.setKeyLength(L);
 rig.moveTo(+(anchorArg ?? 4), { instant: true });
 rig.update(0.016);
@@ -26,7 +26,8 @@ for (const a of acts) {
 }
 rig.root.updateMatrixWorld(true);
 const W = kbW * SS, Hh = (kbH + extra) * SS, px = s * SS;
-const img = new Float32Array(W * Hh * 3), zb = new Float32Array(W * Hh).fill(-1e9);
+const img = new Float32Array(W * Hh * 3), zb = new Float32Array(W * Hh).fill(-1e9), hand = new Float32Array(W * Hh * 4);
+const ALPHA = +(env.ALPHA || 1);
 const isW = m => WHITE.includes(m % 12);
 const whites = []; for (let m = LOW; m <= HIGH; m++) if (isW(m)) whites.push(m);
 const srgb = h => [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255].map(x => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
@@ -64,7 +65,7 @@ function shade(i0, i1, i2, w0, w1, w2) {
   for (let k = 0; k < 3; k++) {
     let alb = (col.getComponent(i0, k) * w0 + col.getComponent(i1, k) * w1 + col.getComponent(i2, k) * w2);
     const ta = T.w * Math.min(1, Math.max(0, (fs2 - 0.15) / 0.7));
-    if (ta > 0) alb = alb + ([T.x, T.y, T.z][k] - alb) * ta * 0.72;
+    if (ta > 0) alb = alb + ([T.x, T.y, T.z][k] - alb) * ta * 0.85;
     out.push(alb * (0.42 * hemi + 0.95 * ndl) + spec + rim * alb);
   }
   return out;
@@ -80,12 +81,19 @@ for (let t = 0; t < idx.length; t += 3) {
     const w0 = ((bx - qx) * (cy - qy) - (by - qy) * (cx - qx)) / area, w1 = ((cx - qx) * (ay - qy) - (cy - qy) * (ax - qx)) / area, w2 = 1 - w0 - w1;
     if (w0 < 0 || w1 < 0 || w2 < 0) continue;
     const z = az * w0 + bz * w1 + cz * w2, o = y * W + x;
-    if (z <= zb[o]) continue; zb[o] = z;
-    const fade = Math.min(1, Math.max(0, (Hh - y) / (46 * SS)));
+    if (z <= zb[o]) continue;
+    const fade = Math.min(1, Math.max(0, (Hh - 8 * SS - y) / (62 * SS)));
     const cl = shade(i0, i1, i2, w0, w1, w2);
-    for (let k = 0; k < 3; k++) img[3 * o + k] = img[3 * o + k] * (1 - fade) + cl[k] * fade;
+    const f = Math.round(fid.getX(i0)), T = tintF[f] || { w: 0 }, fs2 = fid.getY(i0) * w0 + fid.getY(i1) * w1 + fid.getY(i2) * w2;
+    const ta = T.w * Math.min(1, Math.max(0, (fs2 - 0.15) / 0.7));
+    const bindZ = g.attributes.position.getZ(i0) * w0 + g.attributes.position.getZ(i1) * w1 + g.attributes.position.getZ(i2) * w2;
+    const sm = Math.min(1, Math.max(0, (0.075 - bindZ) / 0.063)), armFade = sm * sm * (3 - 2 * sm);
+    if (armFade <= 0) continue;
+    const a = (ALPHA + (0.95 - ALPHA) * Math.min(1, ta)) * fade * armFade;
+    zb[o] = z; hand.set([cl[0], cl[1], cl[2], a], 4 * o);
   }
 }
+for (let o = 0; o < W * Hh; o++) { const a = hand[4 * o + 3]; if (a > 0) for (let k = 0; k < 3; k++) img[3 * o + k] = img[3 * o + k] * (1 - a) + hand[4 * o + k] * a; }
 // downsample + tone
 const OW = kbW, OH = kbH + extra, png = new PNG({ width: OW, height: OH });
 const enc = x => { x = Math.max(0, Math.min(1, x)); return Math.round(255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055)); };

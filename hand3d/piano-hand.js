@@ -8,6 +8,8 @@
 //   hand.press(3);         // finger strikes (green flash); press(3, { color: 'miss' }) for orange
 //   hand.play(5, { delay: 0.5, duration: 0.4 }); // scheduled strike with anticipation, for demos
 //
+// Hand model: WebXR Input Profiles "generic-hand" (MIT, Copyright (c) 2019 Amazon), re-rigged by src/convert-hand.mjs.
+//
 // Keyboard space ("key units"): one white key is 1 wide. x = 0 is the left edge of the leftmost white key,
 // y is up from the key tops, z points toward the player with z = 0 at the back of the keys.
 import * as THREE from 'three';
@@ -19,14 +21,17 @@ export const FINGERS = { 1: 'thumb', 2: 'index', 3: 'middle', 4: 'ring', 5: 'pin
 const COLORS = { next: 0xc8102e, ok: 0x16a06a, miss: 0xe2833b };
 
 // Resting "holding a ball" shape and how the hand sits on the keys. Angles in degrees, lengths in key units.
+// Based on common teaching advice (flowkey, MusicRadar, "Fundamentals of Piano Practice"): wrist about level with the
+// knuckles and a little above the keys, fingers gently rounded ("holding a ball"), fingertip pads just in front of the
+// black keys, thumb fairly straight and resting on its side near the front of its key, hand slightly turned in.
 export const DEFAULT_POSE = {
-  wristX: 2.9, wristY: 2.8, pitch: -7, yaw: 2, roll: -4, wristFlex: -6,
-  tipZ: 0.6, thumbZ: 0,                    // middle fingertip depth as a fraction of the key length (thumbZ: optional thumb depth)
-  tipY: { 1: 0.2, 2: 0.07, 3: 0.07, 4: 0.07, 5: 0.07 },
-  curl: { 1: [6, 14], 2: [42, 20], 3: [50, 24], 4: [48, 22], 5: [30, 13] }, // second and third joint
-  twist: { 1: -12, 2: -2, 3: 0, 4: 2, 5: 5 },
-  start: { 1: [-8, 18], 2: [-3, 28], 3: [0, 28], 4: [3, 28], 5: [8, 26] },  // [abduction, first joint] guesses
-  lift: [18, 9, 2], press: [9, 5, 1], thumbLift: [9, 8, 4], thumbPress: [7, 6, 3],
+  wristX: 3.3, wristY: 1.7, pitch: -2, yaw: 4, roll: -3, wristFlex: 0,
+  tipZ: 0.6, thumbZ: 0.88,                 // middle fingertip / thumb tip depth as a fraction of the key length
+  tipY: { 1: 0.15, 2: 0.07, 3: 0.07, 4: 0.07, 5: 0.07 },
+  curl: { 1: [2, 6], 2: [26, 10], 3: [28, 11], 4: [26, 10], 5: [22, 9] }, // second and third joint
+  twist: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  start: { 1: [15, 20], 2: [0, 25], 3: [0, 25], 4: [0, 25], 5: [0, 25] },  // [abduction, first joint] guesses
+  lift: [18, 9, 2], press: [9, 5, 1], thumbLift: [8, 6, 3], thumbPress: [8, 5, 2],
   shiftLift: 0.55, readyLift: 0.55,
 };
 
@@ -48,7 +53,7 @@ export class HandRig {
     this.root.add(model);
     this.bones = {}; this.mesh = null;
     model.traverse(o => { if (o.isBone) { this.bones[o.name] = o; o.userData.bindQ = o.quaternion.clone(); } if (o.isSkinnedMesh) this.mesh = o; });
-    this.keyLength = 6.4;
+    this.keyLength = 6.4; // a real white key is about 15 cm, 6.4 key widths
     this.cache = new Map();
     this.from = null; this.to = null; this.shiftT = 1; this.shiftDur = 0.5;
     this.ready = {}; this.pressS = {}; this.flash = {};
@@ -88,19 +93,20 @@ export class HandRig {
       // fingers: abduction + first joint reach x and y. Thumb: also its middle joint, to reach tipZ[1] of the key length.
       const n = f === 1 && P.thumbZ ? 3 : 2; if (n === 3) tgt.push(P.thumbZ * this.keyLength - sol.dz);
       let x = [...P.start[f], c2];
+      const lo = [-40, -30, -10], hi = [40, 90, 80];
       const err = q => { this.setFinger(f, q[0], q[1], n === 3 ? q[2] : c2, c3); const p = this.tipWorld(f); return [p.x - tgt[0], p.y - tgt[1], p.z - tgt[2]].slice(0, n); };
-      for (let it = 0; it < 16; it++) {
-        const e = err(x); if (Math.hypot(...e) < 2e-4) break;
-        const Jm = [];
-        for (let k = 0; k < n; k++) { const q = x.slice(); q[k] += 0.25; const ek = err(q); Jm.push(ek.map((v, i) => (v - e[i]) / 0.25)); } // Jm[k][i] = d e_i / d x_k
-        const A = Array.from({ length: n }, (_, i) => [...Array.from({ length: n }, (_, k) => Jm[k][i]), -e[i]]);
-        for (let i = 0; i < n; i++) { // Gaussian elimination with partial pivoting
-          let pv = i; for (let r = i + 1; r < n; r++) if (Math.abs(A[r][i]) > Math.abs(A[pv][i])) pv = r;
-          [A[i], A[pv]] = [A[pv], A[i]]; if (Math.abs(A[i][i]) < 1e-9) break;
-          for (let r = 0; r < n; r++) if (r !== i) { const m = A[r][i] / A[i][i]; for (let k = i; k <= n; k++) A[r][k] -= m * A[i][k]; }
-        }
-        let d = A.map((row, i) => row[n] / row[i] || 0); const m = Math.max(...d.map(Math.abs)); if (m > 8) d = d.map(v => v * 8 / m);
-        x = x.map((v, k) => clamp(v + d[k], k === 0 ? -35 : -30, k === 0 ? 35 : 85));
+      let e = err(x), lam = 0.01;
+      for (let it = 0; it < 60; it++) { // damped least squares on a numeric Jacobian
+        const c0 = Math.hypot(...e); if (c0 < 2e-4) break;
+        const Jm = []; // Jm[i][k] = d e_i / d x_k
+        for (let k = 0; k < n; k++) { const q = x.slice(); q[k] += 0.25; const ek = err(q); ek.forEach((v, i) => { (Jm[i] ||= [])[k] = (v - e[i]) / 0.25; }); }
+        const A = Array.from({ length: n }, (_, a) => Array.from({ length: n }, (_, b) => Jm.reduce((s, r) => s + r[a] * r[b], 0) + (a === b ? lam : 0)));
+        const g = Array.from({ length: n }, (_, a) => -Jm.reduce((s, r, i) => s + r[a] * e[i], 0));
+        for (let i = 0; i < n; i++) { for (let r = i + 1; r < n; r++) { const m = A[r][i] / A[i][i]; for (let k = i; k < n; k++) A[r][k] -= m * A[i][k]; g[r] -= m * g[i]; } }
+        const d = new Array(n).fill(0); for (let i = n - 1; i >= 0; i--) { let s2 = g[i]; for (let k = i + 1; k < n; k++) s2 -= A[i][k] * d[k]; d[i] = s2 / A[i][i]; }
+        const m = Math.max(...d.map(Math.abs)), sc = m > 10 ? 10 / m : 1;
+        const xn = x.map((v, k) => clamp(v + d[k] * sc, lo[k], hi[k])), en = err(xn);
+        if (Math.hypot(...en) < c0) { x = xn; e = en; lam = Math.max(1e-4, lam * 0.5); } else lam *= 4;
       }
       sol.fingers[f] = [x[0], x[1], n === 3 ? x[2] : c2, c3];
       if (f === 3) sol.dz = P.tipZ * this.keyLength - this.tipWorld(3).z;
@@ -149,8 +155,8 @@ export class HandRig {
     for (let f = 1; f <= 5; f++) {
       const T = this.tint[f], fl = this.flash[f];
       fl.a *= Math.exp(-dt / 0.22);
-      const base = f === this.highlighted ? 0.5 + 0.12 * Math.sin(this.time * 5.5) : 0;
-      if (fl.a > base) T.set(fl.c.r, fl.c.g, fl.c.b, fl.a); else if (base > 0) { _v.set(0.784, 0.063, 0.18); T.set(_v.x, _v.y, _v.z, base); } else T.w = 0;
+      const base = f === this.highlighted ? 0.78 + 0.12 * Math.sin(this.time * 5.5) : 0;
+      if (fl.a > 0.12) T.set(fl.c.r, fl.c.g, fl.c.b, Math.min(1, fl.a + 0.3)); else if (base > 0) { _v.set(0.784, 0.063, 0.18); T.set(_v.x, _v.y, _v.z, base); } else T.w = 0;
     }
   }
   apply() {
@@ -172,19 +178,23 @@ export class HandRig {
 }
 
 // Skin material with a per-finger tint taken from the _finger attribute (finger number, strength).
-function makeSkinMaterial(rig) {
-  const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.5, metalness: 0, sheen: 0.55, sheenRoughness: 0.55, sheenColor: new THREE.Color(0xffc7b0), specularIntensity: 0.4 });
+// Semi-transparent: keys and labels show through, the finger to play turns nearly opaque. The forearm stub fades out.
+function makeSkinMaterial(rig, opacity) {
+  const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.5, metalness: 0, sheen: 0.55, sheenRoughness: 0.55, sheenColor: new THREE.Color(0xffc7b0), specularIntensity: 0.4, transparent: true, opacity, depthWrite: false });
   m.onBeforeCompile = sh => {
     sh.uniforms.uTint = { value: rig.tint };
-    sh.vertexShader = 'attribute vec2 _finger;\nvarying vec2 vFinger;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvFinger = _finger;');
-    sh.fragmentShader = 'uniform vec4 uTint[6];\nvarying vec2 vFinger;\n' + sh.fragmentShader
+    sh.vertexShader = 'attribute vec2 _finger;\nvarying vec2 vFinger;\nvarying float vArm;\n' + sh.vertexShader
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFinger = _finger;')
+      .replace('#include <skinning_vertex>', '#include <skinning_vertex>\nvArm = transformed.z;');
+    sh.fragmentShader = 'uniform vec4 uTint[6];\nvarying vec2 vFinger;\nvarying float vArm;\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
       int fi = int(vFinger.x + 0.5);
       vec4 tn = vec4(0.0);
       if (fi == 1) tn = uTint[1]; else if (fi == 2) tn = uTint[2]; else if (fi == 3) tn = uTint[3]; else if (fi == 4) tn = uTint[4]; else if (fi == 5) tn = uTint[5];
       float ta = tn.a * smoothstep(0.15, 0.85, vFinger.y);
-      diffuseColor.rgb = mix(diffuseColor.rgb, tn.rgb, ta * 0.72);`)
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += tn.rgb * ta * 0.32;');
+      diffuseColor.rgb = mix(diffuseColor.rgb, tn.rgb, ta * 0.85);
+      diffuseColor.a = mix(diffuseColor.a, 0.95, ta) * smoothstep(0.075, 0.012, vArm);`)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += tn.rgb * ta * 0.4;');
   };
   return m;
 }
@@ -203,18 +213,28 @@ export class PianoHand {
     if (bad) { hand.dispose(); throw new Error('shader failed to compile'); }
     return hand;
   }
-  constructor({ container, whiteKeys = 12, keyboardHeight, labels = true, pose, shadows = true, maxPixelRatio = 2, keyLength = 5.6 }, model, canvas) {
+  constructor({ container, whiteKeys = 12, keyboardHeight, labels = true, pose, shadows = true, maxPixelRatio = 2, keyLength = 6.4, opacity = 0.5 }, model, canvas) {
     this.container = container; this.prefL = keyLength; this.NW = whiteKeys; this.kbH = keyboardHeight || (() => container.clientHeight);
     this.rig = new HandRig(model, pose);
-    const mat = makeSkinMaterial(this.rig);
-    model.traverse(o => { if (o.isMesh) { o.material = mat; o.castShadow = true; o.frustumCulled = false; } });
+    const mat = makeSkinMaterial(this.rig, opacity);
+    const depthMat = new THREE.MeshBasicMaterial({ colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+    depthMat.onBeforeCompile = sh => { // depth pre-pass, so only the front surface of the see-through hand is drawn
+      sh.vertexShader = 'varying float vArm;\n' + sh.vertexShader.replace('#include <skinning_vertex>', '#include <skinning_vertex>\nvArm = transformed.z;');
+      sh.fragmentShader = 'varying float vArm;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n if (vArm > 0.03) discard;');
+    };
+    const skinned = []; model.traverse(o => { if (o.isSkinnedMesh) skinned.push(o); });
+    for (const o of skinned) {
+      o.material = mat; o.castShadow = true; o.frustumCulled = false; o.renderOrder = 2;
+      const pre = new THREE.SkinnedMesh(o.geometry, depthMat); pre.bind(o.skeleton, o.bindMatrix); pre.frustumCulled = false; pre.renderOrder = 1;
+      o.parent.add(pre);
+    }
     const r = this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxPixelRatio));
     r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.NeutralToneMapping; r.toneMappingExposure = 1.05;
     r.shadowMap.enabled = shadows; r.shadowMap.type = THREE.PCFSoftShadowMap;
     canvas.className = 'ph-canvas';
     Object.assign(canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', pointerEvents: 'none',
-      maskImage: 'linear-gradient(to bottom,#000 calc(100% - 46px),transparent)', webkitMaskImage: 'linear-gradient(to bottom,#000 calc(100% - 46px),transparent)' });
+      maskImage: 'linear-gradient(to bottom,#000 calc(100% - 56px),transparent calc(100% - 6px))', webkitMaskImage: 'linear-gradient(to bottom,#000 calc(100% - 56px),transparent calc(100% - 6px))' });
     container.appendChild(canvas);
     const sc = this.scene = new THREE.Scene();
     sc.add(this.rig.root);
@@ -224,7 +244,7 @@ export class PianoHand {
     const sCam = key.shadow.camera; sCam.left = -9; sCam.right = 9; sCam.top = 9; sCam.bottom = -9; sCam.near = 0.5; sCam.far = 60;
     sc.add(key, key.target);
     const rim = new THREE.DirectionalLight(0xffe2d0, 0.7); rim.position.set(6, 4, -6); sc.add(rim);
-    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.ShadowMaterial({ opacity: 0.22 }));
+    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.ShadowMaterial({ opacity: 0.14 }));
     this.ground.rotation.x = -Math.PI / 2; this.ground.receiveShadow = true; sc.add(this.ground);
     try { // soft studio reflections
       import('three/addons/environments/RoomEnvironment.js').then(({ RoomEnvironment }) => {
