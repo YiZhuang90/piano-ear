@@ -24,7 +24,7 @@ body{background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans SC",system-
 .wrap{max-width:1240px;margin:0 auto;padding-block:20px 40px;padding-left:max(5vw,16px,env(safe-area-inset-left,0px));padding-right:max(5vw,16px,env(safe-area-inset-right,0px))}
 header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:14px}
 h1{font-size:clamp(30px,5vw,44px);line-height:1.05;letter-spacing:-.02em;font-weight:900;margin:0}
-.chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:var(--panel);color:var(--mute);font-size:14px;border:1px solid var(--line)}
+.chip{font:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:var(--panel);color:var(--mute);font-size:14px;border:1px solid var(--line)}
 .dot{width:10px;height:10px;border-radius:50%;background:#9aa0a8}
 .chip.on .dot{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 25%,transparent)}
 .chip.tap .dot{background:var(--warn)}
@@ -86,8 +86,12 @@ details summary{cursor:pointer;font-weight:700}
 <div class="wrap">
 <header>
   <h1>听音钢琴课</h1>
-  <span class="chip" id="micChip"><span class="dot"></span><span id="micTxt">麦克风未开启</span></span>
+  <div class="row" style="align-items:center">
+    <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
+    <button class="btn main" id="startBtn" type="button">开始听</button>
+  </div>
 </header>
+<div id="micNote" class="notice" hidden style="margin-bottom:14px"></div>
 
 <div class="grid">
 <section>
@@ -108,11 +112,9 @@ details summary{cursor:pointer;font-weight:700}
 <aside class="side">
   <div class="panel">
     <div class="row">
-      <button class="btn main" id="startBtn">开始听</button>
       <button class="btn" id="demoBtn">听示范</button>
       <button class="btn" id="resetBtn">重来</button>
     </div>
-    <div id="micNote" class="notice" hidden></div>
     <div>
       <h2>选一课</h2>
       <div class="songs" id="songs"></div>
@@ -415,24 +417,44 @@ $('demoBtn').onclick = () => {
 // 麦克风
 let det = null, an = null, buf = null, listening = false;
 function micState(cls, txt) { const c = $('micChip'); c.className = 'chip ' + cls; $('micTxt').textContent = txt; }
-async function startMic() {
-  const note = $('micNote');
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return micFail('这个页面打不开麦克风。');
-  try {
-    const c = getCtx();
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-    const src = c.createMediaStreamSource(stream); an = c.createAnalyser(); an.fftSize = 2048; src.connect(an);
-    buf = new Float32Array(an.fftSize);
-    det = PitchCore(c.sampleRate, { refA4: refA4 });
-    det.on(ev => { if (c.currentTime < muteUntil) return; recent.push(ev.cents); if (recent.length > 8) recent.shift(); showCents(ev.cents); onNote(ev.midi, 'mic'); });
-    listening = true; note.hidden = true; micState('on', '正在听');
-    $('startBtn').textContent = '在听了';
-    loop();
-  } catch (e) { micFail(e && e.name === 'NotAllowedError' ? '麦克风被拒绝或被页面拦住了。' : '麦克风打不开。'); }
+let asking = false;
+const IN_APP = /MicroMessenger|WeChat|FBAN|FBAV|Instagram|Line\/|Claude/i.test(navigator.userAgent);
+const NO_API = '这个浏览器不让网页用麦克风。' + (IN_APP ? '你可能是在某个 App 里打开的，请点右上角菜单，选“在 Safari 中打开”。' : '请用 Safari 或 Chrome 直接打开这个网址。');
+function startMic() {
+  if (listening || asking) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return micFail(NO_API);
+  asking = true; micState('', '正在请求麦克风…');
+  const c = getCtx(); // 和 getUserMedia 在同一次点按里，iOS 才放行声音
+  const slow = setTimeout(() => { if (asking) showNote('屏幕上如果弹出“允许使用麦克风”，请点“允许”。'); }, 5000);
+  const ask = cons => navigator.mediaDevices.getUserMedia({ audio: cons });
+  ask({ echoCancellation: false, noiseSuppression: false, autoGainControl: false })
+    .catch(e => (e && (e.name === 'OverconstrainedError' || e.name === 'TypeError')) ? ask(true) : Promise.reject(e))
+    .then(async stream => {
+      clearTimeout(slow); asking = false;
+      try { await c.resume(); } catch (e) {}
+      const src = c.createMediaStreamSource(stream); an = c.createAnalyser(); an.fftSize = 2048; src.connect(an);
+      buf = new Float32Array(an.fftSize);
+      det = PitchCore(c.sampleRate, { refA4: refA4 });
+      det.on(ev => { if (c.currentTime < muteUntil) return; recent.push(ev.cents); if (recent.length > 8) recent.shift(); showCents(ev.cents); onNote(ev.midi, 'mic'); });
+      listening = true; $('micNote').hidden = true; micState('on', '正在听');
+      $('startBtn').hidden = true;
+      if (c.state !== 'running') showNote('麦克风开了，但声音还没启动。请再点一下屏幕上任意一个琴键。');
+      stream.getAudioTracks().forEach(t => t.addEventListener('ended', () => { listening = false; $('startBtn').hidden = false; micFail('麦克风被关掉了（可能是来电或切到别的 App）。点“开始听”重新打开。'); }));
+      loop();
+    })
+    .catch(e => {
+      clearTimeout(slow); asking = false;
+      const n = e && e.name;
+      if (n === 'NotAllowedError' || n === 'PermissionDeniedError') micFail('麦克风被拒绝了。在 Safari 里点地址栏左边的“大小”按钮，进“网站设置”，把麦克风改成“允许”，然后刷新页面。也可以在 iPhone 的 设置 > App > Safari > 麦克风 里改成“询问”。');
+      else if (n === 'NotFoundError' || n === 'DevicesNotFoundError') micFail('没找到麦克风。');
+      else if (n === 'NotReadableError' || n === 'TrackStartError') micFail('麦克风正被别的 App 用着（比如通话、录音），关掉后再点“开始听”。');
+      else if (n === 'SecurityError') micFail(NO_API);
+      else micFail('麦克风打不开（' + (n || '未知原因') + '）。');
+    });
 }
+function showNote(t) { const note = $('micNote'); note.hidden = false; note.textContent = t; }
 function micFail(why) {
-  const note = $('micNote'); note.hidden = false;
-  note.textContent = why + ' 先用点按模式：直接点下面的琴键，课程一样能走完。';
+  showNote(why + ' 现在先用点按模式：直接点琴键，课程一样能走完。');
   micState('tap', '点按模式');
 }
 function loop() {
@@ -460,13 +482,15 @@ $('calBtn').onclick = () => {
 $('calReset').onclick = () => setRef(440);
 setRef(refA4);
 
-$('startBtn').onclick = () => { if (!listening) startMic(); };
+$('startBtn').onclick = startMic;
+$('micChip').onclick = () => { if (!listening) startMic(); };
+kb.addEventListener('pointerdown', () => { if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {}); });
 $('resetBtn').onclick = reset;
 $('songs').onclick = e => { const b = e.target.closest('.song'); if (b) setSong(SONGS.find(s => s.id === b.dataset.id)); };
 $('labelSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; labelMode = b.dataset.l; $('labelSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); buildKb(); draw(); };
 
 buildKb(); renderSongs(); draw();
-if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) micFail('这个页面打不开麦克风。');
+if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) micFail(NO_API);
 }
 </script>
 
