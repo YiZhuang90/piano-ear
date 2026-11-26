@@ -32,13 +32,13 @@ h1{font-size:clamp(30px,5vw,44px);line-height:1.05;letter-spacing:-.02em;font-we
 .grid{display:grid;gap:20px}
 @media(min-width:900px){.grid{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);align-items:start}.side{position:sticky;top:16px}}
 .stage{background:linear-gradient(var(--lac2),var(--lac) 40%);border-radius:18px;padding:14px 12px 12px;color:#f1efe9}
-.lane{position:relative;height:clamp(170px,30vh,300px);overflow:hidden;border-radius:10px 10px 0 0;background:repeating-linear-gradient(90deg,transparent 0 calc(100%/var(--nw) - 1px),rgba(255,255,255,.05) calc(100%/var(--nw) - 1px) calc(100%/var(--nw)))}
-.blk{position:absolute;bottom:0;transform:translateX(-50%);display:grid;place-items:center;align-content:center;gap:1px;border-radius:8px;font-weight:700;font-size:13px;line-height:1.1;transition:bottom .28s ease,opacity .28s ease,left .28s ease;white-space:nowrap}
-.blk.w{width:calc(100%/var(--nw) - 4px);height:46px;background:#f3f1ec;color:#141518}
-.blk.b{width:calc(100%/var(--nw)*0.7);height:46px;background:#3a3d45;color:#fff;outline:2px solid #f3f1ec}
+.lane{position:relative;height:clamp(84px,12vh,120px);overflow:hidden;border-radius:10px 10px 0 0;background:repeating-linear-gradient(90deg,transparent 0 calc(100%/var(--nw) - 1px),rgba(255,255,255,.05) calc(100%/var(--nw) - 1px) calc(100%/var(--nw)))}
+.blk{position:absolute;bottom:0;transform:translateX(-50%);display:grid;place-items:center;align-content:center;gap:1px;border-radius:7px;font-weight:700;font-size:11px;line-height:1;transition:bottom .28s ease,opacity .28s ease,left .28s ease;white-space:nowrap}
+.blk.w{width:calc(100%/var(--nw) - 4px);height:32px;background:#f3f1ec;color:#141518}
+.blk.b{width:calc(100%/var(--nw)*0.7);height:32px;background:#3a3d45;color:#fff;outline:2px solid #f3f1ec}
 .blk.now{background:var(--felt);color:#fff;outline:none;box-shadow:0 0 0 3px rgba(200,16,46,.35)}
-.lyric{position:absolute;left:10px;top:8px;font-size:14px;color:#c9c6bf;right:10px}
-.fg{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#141518;color:#fff;font-size:13px;font-style:normal}
+.lyric{position:absolute;left:8px;top:4px;font-size:12px;color:#c9c6bf;right:10px}
+.fg{display:grid;place-items:center;width:15px;height:15px;border-radius:50%;background:#141518;color:#fff;font-size:10px;font-style:normal}
 .blk.now .fg{background:#fff;color:var(--felt)}
 .handov{position:absolute;left:0;right:0;top:0;bottom:-66px;pointer-events:none;z-index:3}
 .handov[hidden]{display:none}
@@ -106,7 +106,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="wrap">
 <div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 6 版</span></h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 7 版</span></h1>
   <div class="row" style="align-items:center">
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
     <button class="btn main" id="startBtn" type="button">开始听</button>
@@ -434,10 +434,11 @@ function draw() {
   if (nt.shift) $('hint').className = 'hint shift'; else $('hint').className = 'hint';
   drawHand(nt.anchor, nt.f);
   $('lyric').textContent = song.lyric ? song.lyric.slice(Math.max(0, idx - 3), idx) + '【' + song.lyric[idx] + '】' + song.lyric.slice(idx + 1, idx + 5) : '';
-  for (let k = 0; k < 5 && idx + k < N; k++) {
+  const laneH = lane.clientHeight || 100, step = Math.max(20, (laneH - 36) / 3); // compact lane: up to 4 upcoming notes, overlapping a little
+  for (let k = 0; k < 5 && idx + k < N && 4 + k * step + 32 <= laneH + 1; k++) {
     const m = song.notes[idx + k].m, el = document.createElement('div');
     el.className = 'blk ' + (isW(m) ? 'w' : 'b') + (k === 0 ? ' now' : '');
-    el.style.left = keyX(m) + '%'; el.style.bottom = (6 + k * 54) + 'px'; el.style.opacity = 1 - k * 0.17;
+    el.style.left = keyX(m) + '%'; el.style.bottom = (4 + k * step) + 'px'; el.style.opacity = 1 - k * 0.2; el.style.zIndex = 10 - k;
     const fgr = song.notes[idx + k].f;
     el.innerHTML = (fgr ? `<i class="fg">${fgr}</i>` : '') + `<span>${nm(m)}</span>`; lane.appendChild(el);
   }
@@ -548,7 +549,7 @@ function startMic() {
 function diag(t) {
   let perm = '';
   const base = '安全连接 ' + (window.isSecureContext ? '是' : '否') + '；mediaDevices ' + (navigator.mediaDevices ? '有' : '无') + '；getUserMedia ' + (navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? '有' : '无') + '；AudioContext ' + (window.AudioContext || window.webkitAudioContext ? '有' : '无');
-  const show = () => { $('diag').textContent = '第 6 版。' + t + '。' + base + perm + '。' + navigator.userAgent; };
+  const show = () => { $('diag').textContent = '第 7 版。' + t + '。' + base + perm + '。' + navigator.userAgent; };
   show();
   try { navigator.permissions.query({ name: 'microphone' }).then(r => { perm = '；麦克风权限 ' + r.state; show(); }, () => {}); } catch (e) {}
 }
@@ -598,8 +599,8 @@ if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) micFail(NO_
 <script type="module">
 // 3D 绑骨右手：hand3d/piano-hand.js + right-hand.glb。WebGL 或网络不行就继续用 2D 手。
 const host = window.__hand3dHost;
-if (host && !host.off) import('./hand3d/piano-hand.js?v=6')
-  .then(({ PianoHand }) => PianoHand.create({ container: host.container(), whiteKeys: host.whiteKeys, keyboardHeight: host.keyboardHeight, glbUrl: './hand3d/right-hand.glb?v=6' }))
+if (host && !host.off) import('./hand3d/piano-hand.js?v=7')
+  .then(({ PianoHand }) => PianoHand.create({ container: host.container(), whiteKeys: host.whiteKeys, keyboardHeight: host.keyboardHeight, glbUrl: './hand3d/right-hand.glb?v=7' }))
   .then(h => host.attach(h))
   .catch(e => console.warn('3D 手没有加载，用 2D 手：', e));
 </script>

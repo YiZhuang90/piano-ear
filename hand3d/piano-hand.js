@@ -213,7 +213,7 @@ export class PianoHand {
     if (bad) { hand.dispose(); throw new Error('shader failed to compile'); }
     return hand;
   }
-  constructor({ container, whiteKeys = 12, keyboardHeight, labels = true, pose, shadows = true, maxPixelRatio = 2, keyLength = 6.4, opacity = 0.5 }, model, canvas) {
+  constructor({ container, whiteKeys = 12, keyboardHeight, labels = true, pose, shadows = true, maxPixelRatio = 2, keyLength = 6.4, opacity = 0.9 }, model, canvas) {
     this.container = container; this.prefL = keyLength; this.NW = whiteKeys; this.kbH = keyboardHeight || (() => container.clientHeight);
     this.rig = new HandRig(model, pose);
     const mat = makeSkinMaterial(this.rig, opacity);
@@ -234,7 +234,7 @@ export class PianoHand {
     r.shadowMap.enabled = shadows; r.shadowMap.type = THREE.PCFSoftShadowMap;
     canvas.className = 'ph-canvas';
     Object.assign(canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', pointerEvents: 'none',
-      maskImage: 'linear-gradient(to bottom,#000 calc(100% - 56px),transparent calc(100% - 6px))', webkitMaskImage: 'linear-gradient(to bottom,#000 calc(100% - 56px),transparent calc(100% - 6px))' });
+      maskImage: 'linear-gradient(to bottom,#000 calc(100% - 34px),transparent calc(100% - 2px))', webkitMaskImage: 'linear-gradient(to bottom,#000 calc(100% - 34px),transparent calc(100% - 2px))' });
     container.appendChild(canvas);
     const sc = this.scene = new THREE.Scene();
     sc.add(this.rig.root);
