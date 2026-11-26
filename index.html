@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>听音钢琴课</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* VOICE everyday, a patient teacher beside a beginner
+   IDEA the piano's own front: black lacquer fallboard, red felt strip, ivory keys; notes fall onto the key to press
+   PICTURE the keyboard G3–C5 drawn large, with falling note blocks landing on the target key
+   COLOUR white ground, piano black, felt red #c8102e for "press this", green for correct
+   TYPE Noto Sans SC 900 display + Noto Sans SC 400 text
+   LAYOUT laptop: stage left, lesson panel right; phone: title, stage, prompt, controls */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#111215);--ink:light-dark(#141519,#ecebe8);--mute:light-dark(#5b5e66,#a3a6ad);--line:light-dark(#e2e3e6,#2a2c31);--panel:light-dark(#f4f5f7,#1a1c20);--lac:#141518;--lac2:#23252b;--felt:#c8102e;--felt2:light-dark(#fde8eb,#3a1218);--ok:#16855a;--ok2:light-dark(#e3f4ec,#10301f);--warn:#b4570a}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans SC",system-ui,sans-serif;overflow-x:clip;margin:0}
+.wrap{max-width:1240px;margin:0 auto;padding-block:20px 40px;padding-left:max(5vw,16px,env(safe-area-inset-left,0px));padding-right:max(5vw,16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:14px}
+h1{font-size:clamp(30px,5vw,44px);line-height:1.05;letter-spacing:-.02em;font-weight:900;margin:0}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:var(--panel);color:var(--mute);font-size:14px;border:1px solid var(--line)}
+.dot{width:10px;height:10px;border-radius:50%;background:#9aa0a8}
+.chip.on .dot{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 25%,transparent)}
+.chip.tap .dot{background:var(--warn)}
+.grid{display:grid;gap:20px}
+@media(min-width:900px){.grid{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);align-items:start}.side{position:sticky;top:16px}}
+.stage{background:linear-gradient(var(--lac2),var(--lac) 40%);border-radius:18px;padding:14px 12px 12px;color:#f1efe9}
+.lane{position:relative;height:clamp(170px,30vh,300px);overflow:hidden;border-radius:10px 10px 0 0;background:repeating-linear-gradient(90deg,transparent 0 calc(100%/11 - 1px),rgba(255,255,255,.05) calc(100%/11 - 1px) calc(100%/11))}
+.blk{position:absolute;bottom:0;transform:translateX(-50%);display:grid;place-items:center;border-radius:8px;font-weight:700;font-size:15px;transition:bottom .28s ease,opacity .28s ease,left .28s ease;white-space:nowrap}
+.blk.w{width:calc(100%/11 - 6px);height:44px;background:#f3f1ec;color:#141518}
+.blk.b{width:calc(100%/11*0.62);height:44px;background:#3a3d45;color:#fff;outline:2px solid #f3f1ec}
+.blk.now{background:var(--felt);color:#fff;outline:none;box-shadow:0 0 0 3px rgba(200,16,46,.35)}
+.lyric{position:absolute;left:10px;top:8px;font-size:14px;color:#c9c6bf}
+.felt{height:6px;background:var(--felt);margin:0 -2px}
+.kb{position:relative;display:flex;height:clamp(130px,22vw,190px);user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.wk{flex:1;margin:0 1px;background:#f6f4ef;border-radius:0 0 7px 7px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:8px;color:#5a5650;font-size:13px;cursor:pointer;border:0;font-family:inherit;transition:background .12s}
+.wk b{font-size:15px;color:#141518}
+.wk .mc{font-size:11px;color:var(--felt);font-weight:700;margin-bottom:2px}
+.bk{position:absolute;top:0;width:calc(100%/11*0.62);height:60%;transform:translateX(-50%);background:linear-gradient(#2e3036,#0d0e10);border-radius:0 0 5px 5px;cursor:pointer;border:0;z-index:2}
+.wk.target{background:#ffd9df}.bk.target{background:linear-gradient(#e0405a,#8d0c22)}
+.wk.hit{background:#c9f0dc}.bk.hit{background:linear-gradient(#25a46f,#0c5a3a)}
+.wk.miss{background:#ffc9a8}.bk.miss{background:linear-gradient(#e2833b,#8a4106)}
+.wk:active{background:#e8e4dc}
+.prompt{margin-top:14px;display:grid;gap:4px}
+.say{font-size:clamp(22px,3.6vw,30px);font-weight:900;line-height:1.2;letter-spacing:-.01em}
+.say em{font-style:normal;color:var(--felt)}
+.hint{color:var(--mute);font-size:16px}
+.fb{min-height:28px;font-size:16px;font-weight:500}
+.fb.good{color:var(--ok)}.fb.bad{color:var(--warn)}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;width:0;background:var(--felt);transition:width .3s}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:14px}
+.panel h2{font-size:17px;margin:0;font-weight:700}
+.songs{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5em,1fr));gap:8px}
+.song{font:inherit;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;min-height:56px}
+.song small{display:block;color:var(--mute);font-size:13px}
+.song[aria-pressed=true]{border-color:var(--felt);box-shadow:inset 0 0 0 1px var(--felt);background:var(--felt2)}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.btn{font:inherit;font-weight:700;min-height:46px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.btn.main{background:var(--felt);border-color:var(--felt);color:#fff}
+.btn:focus-visible,.song:focus-visible,.wk:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{font:inherit;font-size:14px;border:0;background:var(--bg);color:var(--ink);padding:8px 12px;min-height:40px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center}
+.stats div{background:var(--bg);border-radius:12px;padding:8px 4px;border:1px solid var(--line)}
+.stats b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
+.stats span{font-size:13px;color:var(--mute)}
+.meter{display:grid;gap:6px}
+.lvl{height:8px;border-radius:99px;background:var(--line);overflow:hidden}.lvl i{display:block;height:100%;width:0;background:var(--ok)}
+.tune{position:relative;height:30px;border-radius:8px;background:linear-gradient(90deg,var(--felt2),var(--ok2) 40% 60%,var(--felt2))}
+.tune i{position:absolute;top:3px;bottom:3px;width:4px;margin-left:-2px;left:50%;background:var(--ink);border-radius:2px;transition:left .15s}
+.small{font-size:14px;color:var(--mute)}
+.notice{font-size:14px;line-height:1.5;background:var(--felt2);border-radius:12px;padding:10px 12px}
+.done{background:var(--ok2);border-radius:14px;padding:14px;margin-top:12px}
+.done b{font-size:22px}
+details summary{cursor:pointer;font-weight:700}
+@media(prefers-reduced-motion:reduce){.blk,.bar i,.tune i{transition:none}}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>听音钢琴课</h1>
+  <span class="chip" id="micChip"><span class="dot"></span><span id="micTxt">麦克风未开启</span></span>
+</header>
+
+<div class="grid">
+<section>
+  <div class="stage">
+    <div class="lane" id="lane"><div class="lyric" id="lyric"></div></div>
+    <div class="felt"></div>
+    <div class="kb" id="kb"></div>
+  </div>
+  <div class="prompt" aria-live="polite">
+    <div class="say" id="say">先点右边“开始听”</div>
+    <div class="hint" id="hint">手机放在谱架上，离琴 30 到 50 厘米，琴的音量开到中等。</div>
+    <div class="fb" id="fb"></div>
+    <div class="bar"><i id="prog"></i></div>
+  </div>
+  <div id="doneBox"></div>
+</section>
+
+<aside class="side">
+  <div class="panel">
+    <div class="row">
+      <button class="btn main" id="startBtn">开始听</button>
+      <button class="btn" id="demoBtn">听示范</button>
+      <button class="btn" id="resetBtn">重来</button>
+    </div>
+    <div id="micNote" class="notice" hidden></div>
+    <div>
+      <h2>选一课</h2>
+      <div class="songs" id="songs"></div>
+    </div>
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <span class="small">琴键上显示</span>
+      <div class="seg" id="labelSeg">
+        <button data-l="sol" aria-pressed="true">唱名</button><button data-l="num" aria-pressed="false">简谱</button><button data-l="abc" aria-pressed="false">音名</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div><b id="sOk">0</b><span>一次弹对</span></div>
+      <div><b id="sBad">0</b><span>弹错次数</span></div>
+      <div><b id="sBest">–</b><span>最好成绩</span></div>
+    </div>
+    <div class="meter">
+      <div class="row" style="justify-content:space-between"><span class="small">听到的音 <b id="heard" style="color:var(--ink)">–</b></span><span class="small" id="centsTxt">音准 –</span></div>
+      <div class="tune" title="中间绿色是准的"><i id="needle"></i></div>
+      <div class="lvl"><i id="lvl"></i></div>
+    </div>
+    <details>
+      <summary>调音校准</summary>
+      <p class="small">电钢琴一般是准的。如果你的琴整体偏高或偏低，在“自由弹”里弹几个音，再点下面的按钮，之后就按你的琴来判断。</p>
+      <div class="row"><button class="btn" id="calBtn">按刚才弹的音校准</button><button class="btn" id="calReset">恢复 440 Hz</button></div>
+      <p class="small" id="calTxt">现在的标准：A4 = 440.0 Hz</p>
+    </details>
+    <p class="small">手机放在谱架上，离琴 30 到 50 厘米，琴的音量开到中等。只能听一个一个的单音，和弦还不行。点屏幕上的琴键也算弹，没有麦克风时可以这样先熟悉。</p>
+  </div>
+</aside>
+</div>
+</div>
+
+<script>
+// 单音钢琴音高 + 起音检测（YIN + 能量起音）。浏览器和 node 测试共用。
+function PitchCore(sr, opt) {
+  opt = opt || {};
+  const fmin = opt.fmin || 90, fmax = opt.fmax || 1300;
+  const tauMin = Math.floor(sr / fmax), tauMax = Math.ceil(sr / fmin);
+  let refA4 = opt.refA4 || 440;
+  let d = null;
+  const hist = [];          // 最近帧 rms
+  let lastOnset = -1, pending = null, floor = 0.002, cur = null;
+  let stable = { midi: -1, n: 0 };
+  const listeners = [];
+
+  function yin(buf) {
+    const N = buf.length, W = Math.min(N - tauMax - 1, 1024);
+    if (W < 256) return null;
+    if (!d || d.length < tauMax + 2) d = new Float32Array(tauMax + 2);
+    let run = 0; d[0] = 1;
+    for (let tau = 1; tau <= tauMax; tau++) {
+      let s = 0;
+      for (let i = 0; i < W; i++) { const x = buf[i] - buf[i + tau]; s += x * x; }
+      run += s;
+      d[tau] = run > 0 ? s * tau / run : 1;
+    }
+    let tau = -1;
+    for (let t = tauMin; t <= tauMax; t++) {
+      if (d[t] < 0.15) { while (t + 1 <= tauMax && d[t + 1] < d[t]) t++; tau = t; break; }
+    }
+    if (tau < 0) { // 没过阈值：取全局最小，低置信度
+      let best = 1;
+      for (let t = tauMin; t <= tauMax; t++) if (d[t] < best) { best = d[t]; tau = t; }
+      if (best > 0.35) return null;
+    }
+    const a = d[tau - 1], b = d[tau], c = tau + 1 <= tauMax ? d[tau + 1] : b;
+    const den = a + c - 2 * b;
+    const shift = den !== 0 ? 0.5 * (a - c) / den : 0;
+    return { f: sr / (tau + shift), clarity: 1 - b };
+  }
+
+  function toMidi(f) { return 69 + 12 * Math.log2(f / refA4); }
+
+  function emit(ev) { listeners.forEach(fn => fn(ev)); }
+
+  function finish() {
+    const p = pending; pending = null;
+    if (!p || p.est.length < 2) return;
+    const m = p.est.map(e => e.m).sort((x, y) => x - y);
+    const med = m[Math.floor(m.length / 2)];
+    const near = m.filter(x => Math.abs(x - med) < 0.5);
+    if (near.length < Math.max(2, m.length * 0.5)) return;
+    const avg = near.reduce((s, x) => s + x, 0) / near.length;
+    const midi = Math.round(avg);
+    cur = midi; stable = { midi, n: 99 };
+    emit({ type: 'note', midi, cents: Math.round((avg - midi) * 100), t: p.t, level: p.peak, how: p.how });
+  }
+
+  function process(buf, t) {
+    let e = 0;
+    for (let i = 0; i < buf.length; i++) e += buf[i] * buf[i];
+    const rms = Math.sqrt(e / buf.length);
+    const past = hist.slice(-6);
+    const minPast = past.length ? Math.min.apply(null, past) : rms;
+    const prev = past.length ? past[past.length - 1] : rms;
+    hist.push(rms); if (hist.length > 40) hist.shift();
+    // 安静时慢慢更新底噪
+    if (rms < floor * 2.5) floor = floor * 0.95 + rms * 0.05;
+    floor = Math.max(floor, 0.0005);
+    const gate = floor * 4 + 0.004;
+
+    let onset = false;
+    if (rms > gate && rms > prev * 1.12 && rms > minPast * 1.7 && (lastOnset < 0 || t - lastOnset > 0.11)) onset = true;
+
+    const p = rms > gate * 0.6 ? yin(buf) : null;
+    const m = p && p.clarity > 0.8 ? toMidi(p.f) : null;
+
+    if (onset) {
+      if (pending) finish();
+      lastOnset = t;
+      pending = { t, est: [], peak: rms, how: 'onset' };
+      stable = { midi: -1, n: 0 };
+    }
+    if (pending) {
+      pending.peak = Math.max(pending.peak, rms);
+      const age = t - pending.t;
+      if (m !== null && age >= 0.025) pending.est.push({ m });
+      if (age > 0.13 || pending.est.length >= 6) finish();
+    } else if (m !== null && rms > gate) {
+      // 连奏：能量没明显跳，但出现了持续的新音高
+      const r = Math.round(m);
+      if (Math.abs(m - r) < 0.35 && r !== cur) {
+        if (r === stable.midi) stable.n++; else stable = { midi: r, n: 1 };
+        if (stable.n >= 4 && t - lastOnset > 0.15) {
+          lastOnset = t; cur = r;
+          emit({ type: 'note', midi: r, cents: Math.round((m - r) * 100), t, level: rms, how: 'legato' });
+        }
+      } else if (r === cur) stable = { midi: -1, n: 0 };
+    }
+    if (rms < gate * 0.5) { cur = null; stable = { midi: -1, n: 0 }; }
+    return { rms, gate, f: p ? p.f : 0, clarity: p ? p.clarity : 0, midi: m };
+  }
+
+  return {
+    process,
+    on(fn) { listeners.push(fn); },
+    setRef(a) { refA4 = a; },
+    get refA4() { return refA4; }
+  };
+}
+if (typeof module !== 'undefined') module.exports = { PitchCore };
+
+</script>
+<script>
+{
+const LOW = 55, HIGH = 72; // G3..C5
+const WHITE = [0,2,4,5,7,9,11];
+const SOL = ['do','','re','','mi','fa','','sol','','la','','si'];
+const NUM = ['1','','2','','3','4','','5','','6','','7'];
+const ABC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const isW = m => WHITE.includes(((m % 12) + 12) % 12);
+const whites = []; for (let m = LOW; m <= HIGH; m++) if (isW(m)) whites.push(m);
+const NW = whites.length;
+const keyX = m => { if (isW(m)) return (whites.indexOf(m) + 0.5) / NW * 100; return (whites.indexOf(m - 1) + 1) / NW * 100; };
+let labelMode = 'sol';
+function nm(m, mode) {
+  mode = mode || labelMode; const p = ((m % 12) + 12) % 12, oct = Math.floor(m / 12) - 1;
+  if (mode === 'abc') return ABC[p] + oct;
+  if (!isW(m)) return mode === 'num' ? '#' + NUM[p - 1] : '升' + SOL[p - 1];
+  let s = mode === 'num' ? NUM[p] : SOL[p];
+  if (mode === 'num') { if (oct < 4) s += '̣'; if (oct > 4) s += '̇'; }
+  return s;
+}
+const fullName = m => nm(m, 'sol') + '（' + nm(m, 'abc').replace(/\d/, '') + '）';
+
+// 曲目：简谱数字 -> midi，C 大调；'5,' 表示低八度
+const deg = { '1': 60, '2': 62, '3': 64, '4': 65, '5': 67, '6': 69, '7': 71 };
+const parse = s => s.trim().split(/\s+/).map(t => { const [d, b] = t.split('/'); let m = deg[d[0]]; if (d.includes(',')) m -= 12; if (d.includes("'")) m += 12; return { m, b: +(b || 1) }; });
+const SONGS = [
+  { id: 'c', name: '第一课 找中央 C', sub: '认识 do re mi', notes: parse('1 2 3 2 1 3 1'),
+    tips: ['黑键是两个一组、三个一组交替排的。在琴的正中间找一组“两个黑键”，它左边紧挨的白键就是中央 C，唱作 do。用右手大拇指弹一下。', '往右一个白键，是 re。用食指弹。', '再往右一个，是 mi，在那组两个黑键的右边。用中指。', '回到 re。', '回到 do。', '跳到 mi，中间隔一个白键。', '最后回家，do。'] },
+  { id: 'tw', name: '小星星', sub: '42 个音', notes: parse('1 1 5 5 6 6 5/2 4 4 3 3 2 2 1/2 5 5 4 4 3 3 2/2 5 5 4 4 3 3 2/2 1 1 5 5 6 6 5/2 4 4 3 3 2 2 1/2'),
+    lyric: '一闪一闪亮晶晶满天都是小星星挂在天上放光明好像许多小眼睛一闪一闪亮晶晶满天都是小星星' },
+  { id: 'tg', name: '两只老虎', sub: '有一个低音 sol', notes: parse('1 2 3 1 1 2 3 1 3 4 5/2 3 4 5/2 5/0.5 6/0.5 5/0.5 4/0.5 3 1 5/0.5 6/0.5 5/0.5 4/0.5 3 1 1 5, 1/2 1 5, 1/2'),
+    lyric: '两只老虎两只老虎跑得快跑得快一只没有耳朵一只没有尾巴真奇怪真奇怪' },
+  { id: 'od', name: '欢乐颂', sub: '只用五个白键', notes: parse('3 3 4 5 5 4 3 2 1 1 2 3 3/1.5 2/0.5 2/2 3 3 4 5 5 4 3 2 1 1 2 3 2/1.5 1/0.5 1/2') },
+  { id: 'free', name: '自由弹', sub: '看看听到了什么', notes: [] }
+];
+
+const $ = id => document.getElementById(id);
+const kb = $('kb'), lane = $('lane');
+let keyEls = {};
+function buildKb() {
+  kb.innerHTML = whites.map(m => `<button class="wk" data-m="${m}" aria-label="${fullName(m)}">${m === 60 ? '<span class="mc">中央C</span>' : ''}<b>${nm(m)}</b></button>`).join('') +
+    Array.from({ length: HIGH - LOW + 1 }, (_, i) => LOW + i).filter(m => !isW(m)).map(m => `<button class="bk" data-m="${m}" style="left:${keyX(m)}%" aria-label="${nm(m, 'abc')}"></button>`).join('');
+  keyEls = {}; kb.querySelectorAll('[data-m]').forEach(el => keyEls[el.dataset.m] = el);
+}
+
+// 状态
+let song = SONGS[0], idx = 0, okFirst = 0, bad = 0, triedWrong = false, finished = false, t0 = 0;
+let best = {}; try { best = JSON.parse(localStorage.getItem('pianoEarBest') || '{}'); } catch (e) {}
+const saveBest = () => { try { localStorage.setItem('pianoEarBest', JSON.stringify(best)); } catch (e) {} };
+
+function renderSongs() {
+  $('songs').innerHTML = SONGS.map(s => `<button class="song" data-id="${s.id}" aria-pressed="${s === song}">${s.name}<small>${s.sub}</small></button>`).join('');
+}
+function setSong(s) { song = s; renderSongs(); reset(); }
+
+function reset() {
+  idx = 0; okFirst = 0; bad = 0; triedWrong = false; finished = false; t0 = 0;
+  $('doneBox').innerHTML = ''; $('fb').textContent = ''; $('fb').className = 'fb';
+  draw();
+}
+
+function clearMarks() { Object.values(keyEls).forEach(el => el.classList.remove('target')); }
+function flash(m, cls) {
+  const el = keyEls[m]; if (!el) return;
+  el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 380);
+}
+
+function draw() {
+  clearMarks();
+  $('sOk').textContent = okFirst; $('sBad').textContent = bad;
+  const b = best[song.id]; $('sBest').textContent = b != null ? b + '%' : '–';
+  lane.querySelectorAll('.blk').forEach(el => el.remove());
+  if (song.id === 'free') {
+    $('say').innerHTML = '随便弹，看看我听到了什么';
+    $('hint').textContent = '一次弹一个键。听到的音会在琴键上亮绿色，右边显示音名和音准。';
+    $('lyric').textContent = ''; $('prog').style.width = '0';
+    return;
+  }
+  const N = song.notes.length;
+  $('prog').style.width = (idx / N * 100) + '%';
+  if (finished) return;
+  const cur = song.notes[idx].m;
+  if (keyEls[cur]) keyEls[cur].classList.add('target');
+  $('say').innerHTML = `弹 <em>${fullName(cur)}</em>`;
+  let tip = song.tips && song.tips[idx];
+  if (!tip) {
+    const prev = idx > 0 ? song.notes[idx - 1].m : null;
+    if (prev === null) tip = '红色的键就是要弹的。中央 C 在中间那组两个黑键的左边。';
+    else if (prev === cur) tip = '和上一个音一样，再弹一次。';
+    else { const d = whiteDist(prev, cur); tip = (d > 0 ? '往右 ' : '往左 ') + Math.abs(d) + ' 个白键。'; }
+  }
+  $('hint').textContent = tip;
+  $('lyric').textContent = song.lyric ? song.lyric.slice(Math.max(0, idx - 3), idx) + '【' + song.lyric[idx] + '】' + song.lyric.slice(idx + 1, idx + 5) : '';
+  for (let k = 0; k < 5 && idx + k < N; k++) {
+    const m = song.notes[idx + k].m, el = document.createElement('div');
+    el.className = 'blk ' + (isW(m) ? 'w' : 'b') + (k === 0 ? ' now' : '');
+    el.style.left = keyX(m) + '%'; el.style.bottom = (6 + k * 52) + 'px'; el.style.opacity = 1 - k * 0.17;
+    el.textContent = nm(m); lane.appendChild(el);
+  }
+}
+const whiteDist = (a, b) => { let n = 0; const s = b > a ? 1 : -1; for (let m = a; m !== b; m += s) if (isW(m + s)) n += s; return n || s; };
+
+function onNote(m, src) {
+  $('heard').textContent = nm(m, 'abc') + ' · ' + nm(m, 'sol');
+  if (song.id === 'free' || finished) { flash(m, 'hit'); return; }
+  if (!t0) t0 = performance.now();
+  const want = song.notes[idx].m, fb = $('fb');
+  if (m === want) {
+    flash(m, 'hit');
+    if (!triedWrong) okFirst++;
+    triedWrong = false; idx++;
+    fb.className = 'fb good'; fb.textContent = ['对了！', '很好', '对', '漂亮', '没错'][idx % 5];
+    if (idx >= song.notes.length) return finish();
+    draw();
+  } else {
+    flash(m, 'miss'); bad++; triedWrong = true;
+    fb.className = 'fb bad';
+    if ((m - want) % 12 === 0) fb.textContent = `音名对了，但${m > want ? '高' : '低'}了 ${Math.abs(m - want) / 12} 个八度。往${m > want ? '左' : '右'}找同样的键。`;
+    else { const d = whiteDist(m, want); fb.textContent = `你弹的是 ${fullName(m)}，要往${d > 0 ? '右' : '左'} ${Math.abs(d)} 个白键${isW(want) ? '' : '，是个黑键'}。`; }
+    $('sBad').textContent = bad;
+  }
+}
+
+function finish() {
+  finished = true; clearMarks(); lane.querySelectorAll('.blk').forEach(el => el.remove());
+  const N = song.notes.length, pct = Math.round(okFirst / N * 100), sec = Math.round((performance.now() - t0) / 1000);
+  if (best[song.id] == null || pct > best[song.id]) { best[song.id] = pct; saveBest(); }
+  $('prog').style.width = '100%'; $('lyric').textContent = '';
+  $('say').textContent = '弹完了！'; $('hint').textContent = '';
+  const stars = pct >= 90 ? '★★★' : pct >= 70 ? '★★☆' : '★☆☆';
+  const next = pct >= 90 ? '可以换下一首了。' : '再弹一遍，记住红色的键在哪里，会越来越快。';
+  $('doneBox').innerHTML = `<div class="done"><b>${stars} ${pct}% 一次弹对</b><p style="margin:6px 0 0">${N} 个音，用了 ${sec} 秒，弹错 ${bad} 次。${next}</p></div>`;
+  draw();
+}
+
+// 声音合成（点按与示范）
+let ctx = null, muteUntil = 0;
+const getCtx = () => { if (!ctx) { const AC = window.AudioContext || window.webkitAudioContext; ctx = new AC(); } if (ctx.state === 'suspended') ctx.resume().catch(() => {}); return ctx; };
+function tone(m, when, dur) {
+  const c = getCtx(), f = 440 * 2 ** ((m - 69) / 12), g = c.createGain(), t = when || c.currentTime;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0008, t + (dur || 0.9) + 0.4);
+  g.connect(c.destination);
+  [[1, 1], [2, 0.45], [3, 0.2], [4, 0.1]].forEach(([k, a]) => { const o = c.createOscillator(), og = c.createGain(); o.frequency.value = f * k; og.gain.value = a; o.connect(og).connect(g); o.start(t); o.stop(t + (dur || 0.9) + 0.5); });
+  muteUntil = Math.max(muteUntil, t + (dur || 0.9) + 0.5);
+}
+kb.addEventListener('pointerdown', e => { const k = e.target.closest('[data-m]'); if (!k) return; e.preventDefault(); const m = +k.dataset.m; tone(m, 0, 0.6); onNote(m, 'tap'); });
+kb.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const k = e.target.closest('[data-m]'); if (k) { e.preventDefault(); tone(+k.dataset.m, 0, 0.6); onNote(+k.dataset.m, 'tap'); } } });
+
+$('demoBtn').onclick = () => {
+  if (song.id === 'free') return;
+  const c = getCtx(); let t = c.currentTime + 0.1; const beat = 0.5;
+  const from = finished ? 0 : idx;
+  song.notes.slice(from, from + 16).forEach(n => { tone(n.m, t, n.b * beat * 0.9); t += n.b * beat; });
+  $('fb').className = 'fb'; $('fb').textContent = '示范播放时暂停听音。';
+};
+
+// 麦克风
+let det = null, an = null, buf = null, listening = false;
+function micState(cls, txt) { const c = $('micChip'); c.className = 'chip ' + cls; $('micTxt').textContent = txt; }
+async function startMic() {
+  const note = $('micNote');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return micFail('这个页面打不开麦克风。');
+  try {
+    const c = getCtx();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const src = c.createMediaStreamSource(stream); an = c.createAnalyser(); an.fftSize = 2048; src.connect(an);
+    buf = new Float32Array(an.fftSize);
+    det = PitchCore(c.sampleRate, { refA4: refA4 });
+    det.on(ev => { if (c.currentTime < muteUntil) return; recent.push(ev.cents); if (recent.length > 8) recent.shift(); showCents(ev.cents); onNote(ev.midi, 'mic'); });
+    listening = true; note.hidden = true; micState('on', '正在听');
+    $('startBtn').textContent = '在听了';
+    loop();
+  } catch (e) { micFail(e && e.name === 'NotAllowedError' ? '麦克风被拒绝或被页面拦住了。' : '麦克风打不开。'); }
+}
+function micFail(why) {
+  const note = $('micNote'); note.hidden = false;
+  note.textContent = why + ' 先用点按模式：直接点下面的琴键，课程一样能走完。';
+  micState('tap', '点按模式');
+}
+function loop() {
+  if (!listening) return;
+  an.getFloatTimeDomainData(buf);
+  const r = det.process(buf, ctx.currentTime);
+  $('lvl').style.width = Math.min(100, r.rms * 900) + '%';
+  requestAnimationFrame(loop);
+}
+let recent = [], refA4 = 440;
+try { refA4 = +localStorage.getItem('pianoEarRef') || 440; } catch (e) {}
+function showCents(c) {
+  $('needle').style.left = (50 + Math.max(-50, Math.min(50, c))) + '%';
+  $('centsTxt').textContent = '音准 ' + (c > 0 ? '+' : '') + c + ' 音分' + (Math.abs(c) <= 15 ? '，准' : c > 0 ? '，偏高' : '，偏低');
+}
+function setRef(a) {
+  refA4 = a; if (det) det.setRef(a); try { localStorage.setItem('pianoEarRef', String(a)); } catch (e) {}
+  $('calTxt').textContent = '现在的标准：A4 = ' + a.toFixed(1) + ' Hz';
+}
+$('calBtn').onclick = () => {
+  if (recent.length < 3) { $('calTxt').textContent = '先在“自由弹”里用麦克风弹至少 3 个音。'; return; }
+  const avg = recent.reduce((s, x) => s + x, 0) / recent.length;
+  setRef(refA4 * 2 ** (avg / 1200)); recent = [];
+};
+$('calReset').onclick = () => setRef(440);
+setRef(refA4);
+
+$('startBtn').onclick = () => { if (!listening) startMic(); };
+$('resetBtn').onclick = reset;
+$('songs').onclick = e => { const b = e.target.closest('.song'); if (b) setSong(SONGS.find(s => s.id === b.dataset.id)); };
+$('labelSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; labelMode = b.dataset.l; $('labelSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); buildKb(); draw(); };
+
+buildKb(); renderSongs(); draw();
+if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) micFail('这个页面打不开麦克风。');
+}
+</script>
+
+</body>
+</html>
