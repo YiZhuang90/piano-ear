@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache">
 <style>body{margin:0}[hidden]{display:none!important}</style>
 </head>
 <body>
@@ -83,9 +84,16 @@ details summary{cursor:pointer;font-weight:700}
 @media(prefers-reduced-motion:reduce){.blk,.bar i,.tune i{transition:none}}
 </style>
 
+<script>
+window.__errs = [];
+function __showErr(t) { window.__errs.push(t); var n = document.getElementById('errBox'); if (n) { n.hidden = false; n.textContent = '页面出错了，请把这段截图发给我：' + window.__errs.join(' / '); } }
+window.addEventListener('error', function (e) { __showErr((e.message || '错误') + (e.lineno ? ' @' + e.lineno : '')); });
+window.addEventListener('unhandledrejection', function (e) { var r = e.reason || {}; __showErr('Promise: ' + (r.name || '') + ' ' + (r.message || r)); });
+</script>
 <div class="wrap">
+<div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课</h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 3 版</span></h1>
   <div class="row" style="align-items:center">
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
     <button class="btn main" id="startBtn" type="button">开始听</button>
@@ -140,6 +148,10 @@ details summary{cursor:pointer;font-weight:700}
       <p class="small">电钢琴一般是准的。如果你的琴整体偏高或偏低，在“自由弹”里弹几个音，再点下面的按钮，之后就按你的琴来判断。</p>
       <div class="row"><button class="btn" id="calBtn">按刚才弹的音校准</button><button class="btn" id="calReset">恢复 440 Hz</button></div>
       <p class="small" id="calTxt">现在的标准：A4 = 440.0 Hz</p>
+    </details>
+    <details>
+      <summary>麦克风诊断</summary>
+      <p class="small" id="diag" style="overflow-wrap:anywhere">点“开始听”之后这里会显示检查结果。</p>
     </details>
     <p class="small">手机放在谱架上，离琴 30 到 50 厘米，琴的音量开到中等。只能听一个一个的单音，和弦还不行。点屏幕上的琴键也算弹，没有麦克风时可以这样先熟悉。</p>
   </div>
@@ -422,9 +434,11 @@ const IN_APP = /MicroMessenger|WeChat|FBAN|FBAV|Instagram|Line\/|Claude/i.test(n
 const NO_API = '这个浏览器不让网页用麦克风。' + (IN_APP ? '你可能是在某个 App 里打开的，请点右上角菜单，选“在 Safari 中打开”。' : '请用 Safari 或 Chrome 直接打开这个网址。');
 function startMic() {
   if (listening || asking) return;
+  diag('已点开始听');
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return micFail(NO_API);
   asking = true; micState('', '正在请求麦克风…');
-  const c = getCtx(); // 和 getUserMedia 在同一次点按里，iOS 才放行声音
+  let c; try { c = getCtx(); } catch (e) { diag('AudioContext 失败 ' + e.name + ' ' + e.message); asking = false; return micFail('这个浏览器的声音功能打不开。'); }
+  // 和 getUserMedia 在同一次点按里，iOS 才放行声音
   const slow = setTimeout(() => { if (asking) showNote('屏幕上如果弹出“允许使用麦克风”，请点“允许”。'); }, 5000);
   const ask = cons => navigator.mediaDevices.getUserMedia({ audio: cons });
   ask({ echoCancellation: false, noiseSuppression: false, autoGainControl: false })
@@ -437,6 +451,7 @@ function startMic() {
       det = PitchCore(c.sampleRate, { refA4: refA4 });
       det.on(ev => { if (c.currentTime < muteUntil) return; recent.push(ev.cents); if (recent.length > 8) recent.shift(); showCents(ev.cents); onNote(ev.midi, 'mic'); });
       listening = true; $('micNote').hidden = true; micState('on', '正在听');
+      diag('成功：拿到麦克风，声音状态 ' + c.state + '，采样率 ' + c.sampleRate);
       $('startBtn').hidden = true;
       if (c.state !== 'running') showNote('麦克风开了，但声音还没启动。请再点一下屏幕上任意一个琴键。');
       stream.getAudioTracks().forEach(t => t.addEventListener('ended', () => { listening = false; $('startBtn').hidden = false; micFail('麦克风被关掉了（可能是来电或切到别的 App）。点“开始听”重新打开。'); }));
@@ -445,12 +460,20 @@ function startMic() {
     .catch(e => {
       clearTimeout(slow); asking = false;
       const n = e && e.name;
+      diag('失败：' + (n || '无名称') + ' ' + ((e && e.message) || ''));
       if (n === 'NotAllowedError' || n === 'PermissionDeniedError') micFail('麦克风被拒绝了。在 Safari 里点地址栏左边的“大小”按钮，进“网站设置”，把麦克风改成“允许”，然后刷新页面。也可以在 iPhone 的 设置 > App > Safari > 麦克风 里改成“询问”。');
       else if (n === 'NotFoundError' || n === 'DevicesNotFoundError') micFail('没找到麦克风。');
       else if (n === 'NotReadableError' || n === 'TrackStartError') micFail('麦克风正被别的 App 用着（比如通话、录音），关掉后再点“开始听”。');
       else if (n === 'SecurityError') micFail(NO_API);
       else micFail('麦克风打不开（' + (n || '未知原因') + '）。');
     });
+}
+function diag(t) {
+  let perm = '';
+  const base = '安全连接 ' + (window.isSecureContext ? '是' : '否') + '；mediaDevices ' + (navigator.mediaDevices ? '有' : '无') + '；getUserMedia ' + (navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? '有' : '无') + '；AudioContext ' + (window.AudioContext || window.webkitAudioContext ? '有' : '无');
+  const show = () => { $('diag').textContent = '第 3 版。' + t + '。' + base + perm + '。' + navigator.userAgent; };
+  show();
+  try { navigator.permissions.query({ name: 'microphone' }).then(r => { perm = '；麦克风权限 ' + r.state; show(); }, () => {}); } catch (e) {}
 }
 function showNote(t) { const note = $('micNote'); note.hidden = false; note.textContent = t; }
 function micFail(why) {
