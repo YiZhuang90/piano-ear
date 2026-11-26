@@ -32,18 +32,30 @@ h1{font-size:clamp(30px,5vw,44px);line-height:1.05;letter-spacing:-.02em;font-we
 .grid{display:grid;gap:20px}
 @media(min-width:900px){.grid{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);align-items:start}.side{position:sticky;top:16px}}
 .stage{background:linear-gradient(var(--lac2),var(--lac) 40%);border-radius:18px;padding:14px 12px 12px;color:#f1efe9}
-.lane{position:relative;height:clamp(170px,30vh,300px);overflow:hidden;border-radius:10px 10px 0 0;background:repeating-linear-gradient(90deg,transparent 0 calc(100%/11 - 1px),rgba(255,255,255,.05) calc(100%/11 - 1px) calc(100%/11))}
-.blk{position:absolute;bottom:0;transform:translateX(-50%);display:grid;place-items:center;border-radius:8px;font-weight:700;font-size:15px;transition:bottom .28s ease,opacity .28s ease,left .28s ease;white-space:nowrap}
-.blk.w{width:calc(100%/11 - 6px);height:44px;background:#f3f1ec;color:#141518}
-.blk.b{width:calc(100%/11*0.62);height:44px;background:#3a3d45;color:#fff;outline:2px solid #f3f1ec}
+.lane{position:relative;height:clamp(170px,30vh,300px);overflow:hidden;border-radius:10px 10px 0 0;background:repeating-linear-gradient(90deg,transparent 0 calc(100%/var(--nw) - 1px),rgba(255,255,255,.05) calc(100%/var(--nw) - 1px) calc(100%/var(--nw)))}
+.blk{position:absolute;bottom:0;transform:translateX(-50%);display:grid;place-items:center;align-content:center;gap:1px;border-radius:8px;font-weight:700;font-size:13px;line-height:1.1;transition:bottom .28s ease,opacity .28s ease,left .28s ease;white-space:nowrap}
+.blk.w{width:calc(100%/var(--nw) - 4px);height:46px;background:#f3f1ec;color:#141518}
+.blk.b{width:calc(100%/var(--nw)*0.7);height:46px;background:#3a3d45;color:#fff;outline:2px solid #f3f1ec}
 .blk.now{background:var(--felt);color:#fff;outline:none;box-shadow:0 0 0 3px rgba(200,16,46,.35)}
-.lyric{position:absolute;left:10px;top:8px;font-size:14px;color:#c9c6bf}
+.lyric{position:absolute;left:10px;top:8px;font-size:14px;color:#c9c6bf;right:10px}
+.fg{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#141518;color:#fff;font-size:13px;font-style:normal}
+.blk.now .fg{background:#fff;color:var(--felt)}
+.handov{position:absolute;left:0;right:0;top:0;bottom:-48px;pointer-events:none;z-index:3}
+.handov[hidden]{display:none}
+.fgr{position:absolute;top:calc((100% - 48px) * var(--tip));bottom:22px;width:calc(100%/var(--nw)*0.56);transform:translateX(-50%) rotate(var(--rot,0deg));transform-origin:50% 100%;border-radius:999px 999px 12px 12px;background:rgba(240,196,160,.34);border:1.5px solid rgba(255,236,218,.75);display:flex;justify-content:center;padding-top:5px;box-sizing:border-box;transition:left .35s,background .15s}
+.fgr i{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:rgba(20,21,24,.72);color:#fff;font:700 12px/1 "Noto Sans SC",sans-serif;font-style:normal}
+.fgr.on{background:rgba(200,16,46,.62);border-color:#fff}
+.fgr.on i{background:#fff;color:var(--felt)}
+.fgr.pr{background:rgba(22,133,90,.7)}
+.palm{position:absolute;bottom:0;height:44px;border-radius:22px 22px 14px 14px;background:rgba(240,196,160,.28);border:1.5px solid rgba(255,236,218,.6);border-top:0;transition:left .35s;color:#f1efe9;font-size:12px;display:grid;place-items:center;box-sizing:border-box}
+.kb.withhand{margin-bottom:48px}
+.shift{color:#f6c344}
 .felt{height:6px;background:var(--felt);margin:0 -2px}
 .kb{position:relative;display:flex;height:clamp(130px,22vw,190px);user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .wk{flex:1;margin:0 1px;background:#f6f4ef;border-radius:0 0 7px 7px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:8px;color:#5a5650;font-size:13px;cursor:pointer;border:0;font-family:inherit;transition:background .12s}
 .wk b{font-size:15px;color:#141518}
 .wk .mc{font-size:11px;color:var(--felt);font-weight:700;margin-bottom:2px}
-.bk{position:absolute;top:0;width:calc(100%/11*0.62);height:60%;transform:translateX(-50%);background:linear-gradient(#2e3036,#0d0e10);border-radius:0 0 5px 5px;cursor:pointer;border:0;z-index:2}
+.bk{position:absolute;top:0;width:calc(100%/var(--nw)*0.62);height:60%;transform:translateX(-50%);background:linear-gradient(#2e3036,#0d0e10);border-radius:0 0 5px 5px;cursor:pointer;border:0;z-index:2}
 .wk.target{background:#ffd9df}.bk.target{background:linear-gradient(#e0405a,#8d0c22)}
 .wk.hit{background:#c9f0dc}.bk.hit{background:linear-gradient(#25a46f,#0c5a3a)}
 .wk.miss{background:#ffc9a8}.bk.miss{background:linear-gradient(#e2833b,#8a4106)}
@@ -93,7 +105,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="wrap">
 <div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 3 版</span></h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 4 版</span></h1>
   <div class="row" style="align-items:center">
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
     <button class="btn main" id="startBtn" type="button">开始听</button>
@@ -103,7 +115,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 
 <div class="grid">
 <section>
-  <div class="stage">
+  <div class="stage" id="stage" style="--nw:12">
     <div class="lane" id="lane"><div class="lyric" id="lyric"></div></div>
     <div class="felt"></div>
     <div class="kb" id="kb"></div>
@@ -272,7 +284,7 @@ if (typeof module !== 'undefined') module.exports = { PitchCore };
 </script>
 <script>
 {
-const LOW = 55, HIGH = 72; // G3..C5
+const LOW = 53, HIGH = 72; // F3..C5，左边三个黑键一组是完整的
 const WHITE = [0,2,4,5,7,9,11];
 const SOL = ['do','','re','','mi','fa','','sol','','la','','si'];
 const NUM = ['1','','2','','3','4','','5','','6','','7'];
@@ -296,22 +308,66 @@ const fullName = m => nm(m, 'sol') + '（' + nm(m, 'abc').replace(/\d/, '') + '�
 const deg = { '1': 60, '2': 62, '3': 64, '4': 65, '5': 67, '6': 69, '7': 71 };
 const parse = s => s.trim().split(/\s+/).map(t => { const [d, b] = t.split('/'); let m = deg[d[0]]; if (d.includes(',')) m -= 12; if (d.includes("'")) m += 12; return { m, b: +(b || 1) }; });
 const SONGS = [
-  { id: 'c', name: '第一课 找中央 C', sub: '认识 do re mi', notes: parse('1 2 3 2 1 3 1'),
-    tips: ['黑键是两个一组、三个一组交替排的。在琴的正中间找一组“两个黑键”，它左边紧挨的白键就是中央 C，唱作 do。用右手大拇指弹一下。', '往右一个白键，是 re。用食指弹。', '再往右一个，是 mi，在那组两个黑键的右边。用中指。', '回到 re。', '回到 do。', '跳到 mi，中间隔一个白键。', '最后回家，do。'] },
-  { id: 'tw', name: '小星星', sub: '42 个音', notes: parse('1 1 5 5 6 6 5/2 4 4 3 3 2 2 1/2 5 5 4 4 3 3 2/2 5 5 4 4 3 3 2/2 1 1 5 5 6 6 5/2 4 4 3 3 2 2 1/2'),
+  { id: 'warm', name: '五指热身', sub: '右手 C 位 1-2-3-4-5', notes: parse('1 2 3 4 5/2 4 3 2 1/2 1 2 3 4 5/2 4 3 2 1/2'),
+    tips: ['先摆好右手：大拇指（1 指）放在中央 C，食指 2 在 D，中指 3 在 E，无名指 4 在 F，小指 5 在 G。一个手指管一个键，整首都不用挪手。手像握着一个小球，指尖立起来。现在用拇指弹 C。', '食指 2 弹 D。慢一点，每个音一样响。', '中指 3。', '无名指 4，它最没力气，弹稳一点。', '小指 5，到顶了。', '往回走，4 指。'] },
+  { id: 'c', name: '找中央 C', sub: '认识 do re mi', notes: parse('1 2 3 2 1 3 1'),
+    tips: ['黑键是两个一组、三个一组交替排的。在琴的正中间找一组“两个黑键”，它左边紧挨的白键就是中央 C，唱作 do。用右手大拇指（1 指）弹一下。', '往右一个白键，是 re。用食指 2 弹。', '再往右一个，是 mi，在那组两个黑键的右边。用中指 3。', '回到 re。', '回到 do。', '跳到 mi，中间隔一个白键。', '最后回家，do。'] },
+  { id: 'hc', name: '热十字包', sub: '只用 1 2 3 指', notes: parse('3 2 1/2 3 2 1/2 1/0.5 1/0.5 1/0.5 1/0.5 2/0.5 2/0.5 2/0.5 2/0.5 3 2 1/2') },
+  { id: 'ml', name: '玛丽有只小羊羔', sub: '五指不挪手', notes: parse('3 2 1 2 3 3 3/2 2 2 2/2 3 5 5/2 3 2 1 2 3 3 3 3 2 2 3 2 1/4') },
+  { id: 'od', name: '欢乐颂', sub: '五指不挪手', notes: parse('3 3 4 5 5 4 3 2 1 1 2 3 3/1.5 2/0.5 2/2 3 3 4 5 5 4 3 2 1 1 2 3 2/1.5 1/0.5 1/2') },
+  { id: 'jb', name: '铃儿响叮当', sub: '副歌，五指不挪手', notes: parse('3 3 3/2 3 3 3/2 3 5 1/1.5 2/0.5 3/4 4 4 4/1.5 4/0.5 4 3 3 3/0.5 3/0.5 3 2 2 3 2/2 5/2 3 3 3/2 3 3 3/2 3 5 1/1.5 2/0.5 3/4 4 4 4/1.5 4/0.5 4 3 3 3/0.5 3/0.5 5 5 4 2 1/4') },
+  { id: 'tw', name: '小星星', sub: '要挪手：会弹到 la', notes: parse('1 1 5 5 6 6 5/2 4 4 3 3 2 2 1/2 5 5 4 4 3 3 2/2 5 5 4 4 3 3 2/2 1 1 5 5 6 6 5/2 4 4 3 3 2 2 1/2'),
+    fing: '1 1 5 5 5 5 4 3 3 2 2 1 1 1 5 5 4 4 3 3 2 5 5 4 4 3 3 2 1 1 5 5 5 5 4 3 3 2 2 1 1 1',
     lyric: '一闪一闪亮晶晶满天都是小星星挂在天上放光明好像许多小眼睛一闪一闪亮晶晶满天都是小星星' },
-  { id: 'tg', name: '两只老虎', sub: '有一个低音 sol', notes: parse('1 2 3 1 1 2 3 1 3 4 5/2 3 4 5/2 5/0.5 6/0.5 5/0.5 4/0.5 3 1 5/0.5 6/0.5 5/0.5 4/0.5 3 1 1 5, 1/2 1 5, 1/2'),
+  { id: 'tg', name: '两只老虎', sub: '要挪手：有低音 sol', notes: parse('1 2 3 1 1 2 3 1 3 4 5/2 3 4 5/2 5/0.5 6/0.5 5/0.5 4/0.5 3 1 5/0.5 6/0.5 5/0.5 4/0.5 3 1 1 5, 1/2 1 5, 1/2'),
+    fing: '1 2 3 1 1 2 3 1 3 4 5 3 4 5 4 5 4 3 2 1 4 5 4 3 2 1 1 1 4 4 1 4',
     lyric: '两只老虎两只老虎跑得快跑得快一只没有耳朵一只没有尾巴真奇怪真奇怪' },
-  { id: 'od', name: '欢乐颂', sub: '只用五个白键', notes: parse('3 3 4 5 5 4 3 2 1 1 2 3 3/1.5 2/0.5 2/2 3 3 4 5 5 4 3 2 1 1 2 3 2/1.5 1/0.5 1/2') },
   { id: 'free', name: '自由弹', sub: '看看听到了什么', notes: [] }
 ];
-
+const FN = ['', '拇指', '食指', '中指', '无名指', '小指'];
+// 指法：有 fing 用 fing；否则按 C 位（C4=1 … G4=5）。再算出每个音时拇指在哪个白键，拇指位置变了就是挪手。
+SONGS.forEach(sg => {
+  const f = sg.fing ? sg.fing.split(' ').map(Number) : null;
+  let prevA = null;
+  sg.notes.forEach((n, i) => {
+    n.f = f ? f[i] : ([60, 62, 64, 65, 67].indexOf(n.m) + 1 || null);
+    const w = whites.indexOf(n.m);
+    n.anchor = n.f && w >= 0 ? w - (n.f - 1) : prevA;
+    n.shift = i > 0 && prevA !== null && n.anchor !== prevA;
+    prevA = n.anchor;
+  });
+});
+// 右手投影在键盘上：五个指尖落在当前手位的五个白键上（右手：拇指在左，小指在右）
+let hand = { anchor: null };
+const TIP = [0.80, 0.60, 0.53, 0.58, 0.68], ROT = [-14, -3, 0, 3, 7];
+function drawHand(anchor, finger) {
+  const ov = $('handov');
+  if (anchor === null || anchor === undefined) { ov.hidden = true; kb.classList.remove('withhand'); hand.anchor = null; return; }
+  ov.hidden = false; kb.classList.add('withhand'); hand.anchor = anchor;
+  const W = 100 / NW;
+  if (!ov.children.length) ov.innerHTML = [1, 2, 3, 4, 5].map(f => `<div class="fgr" data-f="${f}"><i>${f}</i></div>`).join('') + '<div class="palm">右手</div>';
+  ov.querySelectorAll('.fgr').forEach(el => {
+    const f = +el.dataset.f, k = anchor + f - 1;
+    el.style.left = ((k + 0.5) * W + (f === 1 ? -W * 0.08 : 0)) + '%';
+    el.style.setProperty('--tip', TIP[f - 1]); el.style.setProperty('--rot', ROT[f - 1] + 'deg');
+    el.classList.toggle('on', f === finger);
+    el.hidden = k < 0 || k >= NW;
+  });
+  const pm = ov.querySelector('.palm');
+  pm.style.left = ((anchor + 0.25) * W) + '%'; pm.style.width = (4.5 * W) + '%';
+}
+function pressFinger(m) {
+  if (hand.anchor === null) return;
+  const f = whites.indexOf(m) - hand.anchor + 1; if (f < 1 || f > 5) return;
+  const el = $('handov').querySelector(`.fgr[data-f="${f}"]`); if (!el) return;
+  el.classList.add('pr'); setTimeout(() => el.classList.remove('pr'), 380);
+}
 const $ = id => document.getElementById(id);
 const kb = $('kb'), lane = $('lane');
 let keyEls = {};
 function buildKb() {
   kb.innerHTML = whites.map(m => `<button class="wk" data-m="${m}" aria-label="${fullName(m)}">${m === 60 ? '<span class="mc">中央C</span>' : ''}<b>${nm(m)}</b></button>`).join('') +
-    Array.from({ length: HIGH - LOW + 1 }, (_, i) => LOW + i).filter(m => !isW(m)).map(m => `<button class="bk" data-m="${m}" style="left:${keyX(m)}%" aria-label="${nm(m, 'abc')}"></button>`).join('');
+    Array.from({ length: HIGH - LOW + 1 }, (_, i) => LOW + i).filter(m => !isW(m)).map(m => `<button class="bk" data-m="${m}" style="left:${keyX(m)}%" aria-label="${nm(m, 'abc')}"></button>`).join('') + '<div class="handov" id="handov" hidden aria-hidden="true"></div>';
   keyEls = {}; kb.querySelectorAll('[data-m]').forEach(el => keyEls[el.dataset.m] = el);
 }
 
@@ -335,6 +391,7 @@ function clearMarks() { Object.values(keyEls).forEach(el => el.classList.remove(
 function flash(m, cls) {
   const el = keyEls[m]; if (!el) return;
   el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 380);
+  pressFinger(m);
 }
 
 function draw() {
@@ -346,28 +403,36 @@ function draw() {
     $('say').innerHTML = '随便弹，看看我听到了什么';
     $('hint').textContent = '一次弹一个键。听到的音会在琴键上亮绿色，右边显示音名和音准。';
     $('lyric').textContent = ''; $('prog').style.width = '0';
+    drawHand(null);
     return;
   }
   const N = song.notes.length;
   $('prog').style.width = (idx / N * 100) + '%';
-  if (finished) return;
+  if (finished) { drawHand(null); return; }
   const cur = song.notes[idx].m;
   if (keyEls[cur]) keyEls[cur].classList.add('target');
-  $('say').innerHTML = `弹 <em>${fullName(cur)}</em>`;
+  const nt = song.notes[idx];
+  $('say').innerHTML = `弹 <em>${fullName(cur)}</em>` + (nt.f ? `，用 ${nt.f} 指（${FN[nt.f]}）` : '');
   let tip = song.tips && song.tips[idx];
   if (!tip) {
     const prev = idx > 0 ? song.notes[idx - 1].m : null;
-    if (prev === null) tip = '红色的键就是要弹的。中央 C 在中间那组两个黑键的左边。';
+    if (prev === null) tip = nt.f ? '摆好右手：拇指放在' + fullName(whites[nt.anchor]) + '，其余四指依次放在右边四个白键上（键盘上画的那只手）。' : '红色的键就是要弹的。中央 C 在中间那组两个黑键的左边。';
+    else if (nt.shift) tip = '挪手：整只手往' + (nt.anchor > song.notes[idx - 1].anchor ? '右' : '左') + '移，拇指换到' + fullName(whites[nt.anchor]) + '上（看键盘上的手）。';
     else if (prev === cur) tip = '和上一个音一样，再弹一次。';
     else { const d = whiteDist(prev, cur); tip = (d > 0 ? '往右 ' : '往左 ') + Math.abs(d) + ' 个白键。'; }
   }
+  $('hint').innerHTML = '';
+  if (nt.shift && song.tips && song.tips[idx]) tip = '挪手。' + tip;
   $('hint').textContent = tip;
+  if (nt.shift) $('hint').className = 'hint shift'; else $('hint').className = 'hint';
+  drawHand(nt.anchor, nt.f);
   $('lyric').textContent = song.lyric ? song.lyric.slice(Math.max(0, idx - 3), idx) + '【' + song.lyric[idx] + '】' + song.lyric.slice(idx + 1, idx + 5) : '';
   for (let k = 0; k < 5 && idx + k < N; k++) {
     const m = song.notes[idx + k].m, el = document.createElement('div');
     el.className = 'blk ' + (isW(m) ? 'w' : 'b') + (k === 0 ? ' now' : '');
-    el.style.left = keyX(m) + '%'; el.style.bottom = (6 + k * 52) + 'px'; el.style.opacity = 1 - k * 0.17;
-    el.textContent = nm(m); lane.appendChild(el);
+    el.style.left = keyX(m) + '%'; el.style.bottom = (6 + k * 54) + 'px'; el.style.opacity = 1 - k * 0.17;
+    const fgr = song.notes[idx + k].f;
+    el.innerHTML = (fgr ? `<i class="fg">${fgr}</i>` : '') + `<span>${nm(m)}</span>`; lane.appendChild(el);
   }
 }
 const whiteDist = (a, b) => { let n = 0; const s = b > a ? 1 : -1; for (let m = a; m !== b; m += s) if (isW(m + s)) n += s; return n || s; };
@@ -471,7 +536,7 @@ function startMic() {
 function diag(t) {
   let perm = '';
   const base = '安全连接 ' + (window.isSecureContext ? '是' : '否') + '；mediaDevices ' + (navigator.mediaDevices ? '有' : '无') + '；getUserMedia ' + (navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? '有' : '无') + '；AudioContext ' + (window.AudioContext || window.webkitAudioContext ? '有' : '无');
-  const show = () => { $('diag').textContent = '第 3 版。' + t + '。' + base + perm + '。' + navigator.userAgent; };
+  const show = () => { $('diag').textContent = '第 4 版。' + t + '。' + base + perm + '。' + navigator.userAgent; };
   show();
   try { navigator.permissions.query({ name: 'microphone' }).then(r => { perm = '；麦克风权限 ' + r.state; show(); }, () => {}); } catch (e) {}
 }
@@ -512,6 +577,7 @@ $('resetBtn').onclick = reset;
 $('songs').onclick = e => { const b = e.target.closest('.song'); if (b) setSong(SONGS.find(s => s.id === b.dataset.id)); };
 $('labelSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; labelMode = b.dataset.l; $('labelSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); buildKb(); draw(); };
 
+$('stage').style.setProperty('--nw', NW);
 buildKb(); renderSongs(); draw();
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) micFail(NO_API);
 }
