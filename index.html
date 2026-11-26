@@ -12,7 +12,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-/* VOICE everyday, a patient teacher beside a beginner
+/* v8: Beyer Op.101 as the curriculum backbone; see lessons/NOTICE.md
+   VOICE everyday, a patient teacher beside a beginner
    IDEA the piano's own front: black lacquer fallboard, red felt strip, ivory keys; notes fall onto the key to press
    PICTURE the keyboard G3–C5 drawn large, with falling note blocks landing on the target key
    COLOUR white ground, piano black, felt red #c8102e for "press this", green for correct
@@ -94,6 +95,46 @@ h1{font-size:clamp(30px,5vw,44px);line-height:1.05;letter-spacing:-.02em;font-we
 .done{background:var(--ok2);border-radius:14px;padding:14px;margin-top:12px}
 .done b{font-size:22px}
 details summary{cursor:pointer;font-weight:700}
+.blk{grid-auto-flow:column;gap:3px}
+.blk .nm{font-size:11px}
+.blk.lh{background:#dfe8fb;color:#16264a}
+.blk.lh.now{background:#2f6fdb;color:#fff;box-shadow:0 0 0 3px rgba(47,111,219,.4)}
+.blk.lh.now .fg{color:#2f6fdb}
+.blk.ghost{background:transparent!important;outline:1.5px dashed rgba(241,239,233,.38)!important;box-shadow:none!important;opacity:.7}
+.blk.ghost.lh{outline-color:rgba(140,175,245,.55)!important}
+.lane.noname .blk:not(.ghost) .nm{visibility:hidden}
+.mline{position:absolute;left:0;right:0;border-top:1px dashed rgba(241,239,233,.28);pointer-events:none}
+.mline span{position:absolute;right:4px;top:-1px;font-size:10px;color:#a9a6a0}
+.wk.target2{background:#cfe0ff}.bk.target2{background:linear-gradient(#5b8ff0,#1d4fb4)}
+.say em.lh{color:#2f6fdb}
+.desk{background:#fbfaf6;border-radius:10px;margin-bottom:8px;color:#141518;position:relative}
+.desk #sheet{position:relative;overflow-x:auto;overflow-y:hidden;min-height:96px;-webkit-overflow-scrolling:touch}
+.desk.faint #sheet{opacity:.32}
+.desk #sheetMsg{position:absolute;left:10px;top:8px;font-size:13px;color:#5b5e66}
+.desk #sheetMsg:empty{display:none}
+.tfb{min-height:22px;font-size:15px;font-weight:700}
+.tfb.good{color:var(--ok)}.tfb.early{color:#2f6fdb}.tfb.late{color:var(--warn)}
+.info{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:4px}
+.info b{font-size:18px}
+.info p{margin:0}
+.lvtag{font-size:12px;color:var(--felt);font-weight:700}
+.tag{display:inline-block;font-size:12px;font-weight:700;color:var(--warn);margin-right:6px}
+.tag.ok{color:var(--ok)}
+.ctl{display:grid;gap:10px}
+.crow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.crow[hidden]{display:none}
+.crow > .small:first-child{min-width:4.5em}
+.crow input[type=range]{flex:1 1 140px;accent-color:var(--felt)}
+.crow select{font:inherit;font-size:14px;padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.crow input[type=checkbox]{accent-color:var(--felt);width:18px;height:18px;vertical-align:-3px}
+.lv{border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:8px 10px}
+.lv + .lv{margin-top:8px}
+.lv summary{display:flex;justify-content:space-between;gap:8px;align-items:baseline;list-style:none}
+.lv summary::-webkit-details-marker{display:none}
+.lv summary small{font-weight:400;color:var(--mute);font-size:13px;white-space:nowrap}
+.lv .songs{margin-top:8px}
+.song .st{display:block;color:#d4a017;font-size:13px;letter-spacing:1px}
+.song.locked{opacity:.5;cursor:not-allowed}
 @media(prefers-reduced-motion:reduce){.blk,.bar i,.tune i{transition:none}}
 </style>
 
@@ -106,7 +147,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="wrap">
 <div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 7 版</span></h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 8 版</span></h1>
   <div class="row" style="align-items:center">
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
     <button class="btn main" id="startBtn" type="button">开始听</button>
@@ -117,6 +158,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="grid">
 <section>
   <div class="stage" id="stage" style="--nw:12">
+    <div class="desk" id="desk" hidden><div id="sheet"></div><div id="sheetMsg"></div></div>
     <div class="lane" id="lane"><div class="lyric" id="lyric"></div></div>
     <div class="felt"></div>
     <div class="kb" id="kb"></div>
@@ -125,6 +167,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
     <div class="say" id="say">先点右边“开始听”</div>
     <div class="hint" id="hint">手机放在谱架上，离琴 30 到 50 厘米，琴的音量开到中等。</div>
     <div class="fb" id="fb"></div>
+    <div class="tfb" id="tfb"></div>
     <div class="bar"><i id="prog"></i></div>
   </div>
   <div id="doneBox"></div>
@@ -136,9 +179,20 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
       <button class="btn" id="demoBtn">听示范</button>
       <button class="btn" id="resetBtn">重来</button>
     </div>
+    <div class="info" id="info"></div>
+    <div class="ctl">
+      <div class="crow" id="rowHands" hidden><span class="small">谁来弹</span><div class="seg" id="handSeg"><button data-v="R">右手</button><button data-v="L">左手</button><button data-v="RL">双手</button></div></div>
+      <div class="crow" id="rowMode"><span class="small">节奏</span><div class="seg" id="modeSeg"><button data-v="wait">等你弹</button><button data-v="beat">跟拍子</button></div></div>
+      <div class="crow" id="rowTempo"><span class="small">速度</span><input type="range" id="tempo" min="40" max="120" step="5" value="60" aria-label="速度"><span class="small" id="tempoTxt"></span></div>
+      <div class="crow" id="rowStaff" hidden><span class="small">五线谱</span><div class="seg" id="staffSeg"><button data-v="off">不看</button><button data-v="faint">淡淡的</button><button data-v="on">清楚</button><button data-v="only">只看谱</button></div></div>
+      <div class="crow" id="rowBars" hidden><span class="small">只练</span><span class="small">第</span><select id="fromSel" aria-label="从第几小节"></select><span class="small">到</span><select id="toSel" aria-label="到第几小节"></select><span class="small">小节</span><label class="small"><input type="checkbox" id="loopChk"> 循环</label></div>
+      <div class="crow" id="rowAcc" hidden><label class="small"><input type="checkbox" id="accChk"> 配伴奏（网页配的简单伴奏，不是原书的老师声部）</label></div>
+    </div>
     <div>
-      <h2>选一课</h2>
-      <div class="songs" id="songs"></div>
+      <h2>课程地图</h2>
+      <p class="small" style="margin:2px 0 8px">前面是入门，后面按拜厄《钢琴基本教程》Op.101 的顺序走。前一课拿到一颗星，下一课就解锁。</p>
+      <div id="map"></div>
+      <label class="small" style="display:block;margin-top:8px"><input type="checkbox" id="unlockAll" style="accent-color:var(--felt)"> 全部解锁（会弹的人直接跳）</label>
     </div>
     <div class="row" style="align-items:center;justify-content:space-between">
       <span class="small">琴键上显示</span>
@@ -283,16 +337,20 @@ function PitchCore(sr, opt) {
 if (typeof module !== 'undefined') module.exports = { PitchCore };
 
 </script>
+<script src="score.js?v=8"></script>
 <script>
 {
-const LOW = 53, HIGH = 72; // F3..C5，左边三个黑键一组是完整的
+const VER = 8;
 const WHITE = [0,2,4,5,7,9,11];
 const SOL = ['do','','re','','mi','fa','','sol','','la','','si'];
 const NUM = ['1','','2','','3','4','','5','','6','','7'];
 const ABC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const isW = m => WHITE.includes(((m % 12) + 12) % 12);
-const whites = []; for (let m = LOW; m <= HIGH; m++) if (isW(m)) whites.push(m);
-const NW = whites.length;
+// 键盘一直是 12 个白键（3D 手按 12 个键对齐），每课按音域挪窗口：比如拜厄是 C4–G5，儿歌是 F3–C5
+const NW = 12, whites = [];
+let LOW = 53, HIGH = 72, winBase = Score.whiteNo(53);
+function setWindow(base) { winBase = base; whites.length = 0; for (let k = 0; k < NW; k++) whites.push(Score.whiteMidi(base + k)); LOW = whites[0]; HIGH = whites[NW - 1]; }
+setWindow(winBase);
 const keyX = m => { if (isW(m)) return (whites.indexOf(m) + 0.5) / NW * 100; return (whites.indexOf(m - 1) + 1) / NW * 100; };
 let labelMode = 'sol';
 function nm(m, mode) {
@@ -303,42 +361,15 @@ function nm(m, mode) {
   if (mode === 'num') { if (oct < 4) s += '̣'; if (oct > 4) s += '̇'; }
   return s;
 }
-const fullName = m => nm(m, 'sol') + '（' + nm(m, 'abc').replace(/\d/, '') + '）';
-
-// 曲目：简谱数字 -> midi，C 大调；'5,' 表示低八度
-const deg = { '1': 60, '2': 62, '3': 64, '4': 65, '5': 67, '6': 69, '7': 71 };
-const parse = s => s.trim().split(/\s+/).map(t => { const [d, b] = t.split('/'); let m = deg[d[0]]; if (d.includes(',')) m -= 12; if (d.includes("'")) m += 12; return { m, b: +(b || 1) }; });
-const SONGS = [
-  { id: 'warm', name: '五指热身', sub: '右手 C 位 1-2-3-4-5', notes: parse('1 2 3 4 5/2 4 3 2 1/2 1 2 3 4 5/2 4 3 2 1/2'),
-    tips: ['先摆好右手：大拇指（1 指）放在中央 C，食指 2 在 D，中指 3 在 E，无名指 4 在 F，小指 5 在 G。一个手指管一个键，整首都不用挪手。手像握着一个小球，指尖立起来。现在用拇指弹 C。', '食指 2 弹 D。慢一点，每个音一样响。', '中指 3。', '无名指 4，它最没力气，弹稳一点。', '小指 5，到顶了。', '往回走，4 指。'] },
-  { id: 'c', name: '找中央 C', sub: '认识 do re mi', notes: parse('1 2 3 2 1 3 1'),
-    tips: ['黑键是两个一组、三个一组交替排的。在琴的正中间找一组“两个黑键”，它左边紧挨的白键就是中央 C，唱作 do。用右手大拇指（1 指）弹一下。', '往右一个白键，是 re。用食指 2 弹。', '再往右一个，是 mi，在那组两个黑键的右边。用中指 3。', '回到 re。', '回到 do。', '跳到 mi，中间隔一个白键。', '最后回家，do。'] },
-  { id: 'hc', name: '热十字包', sub: '只用 1 2 3 指', notes: parse('3 2 1/2 3 2 1/2 1/0.5 1/0.5 1/0.5 1/0.5 2/0.5 2/0.5 2/0.5 2/0.5 3 2 1/2') },
-  { id: 'ml', name: '玛丽有只小羊羔', sub: '五指不挪手', notes: parse('3 2 1 2 3 3 3/2 2 2 2/2 3 5 5/2 3 2 1 2 3 3 3 3 2 2 3 2 1/4') },
-  { id: 'od', name: '欢乐颂', sub: '五指不挪手', notes: parse('3 3 4 5 5 4 3 2 1 1 2 3 3/1.5 2/0.5 2/2 3 3 4 5 5 4 3 2 1 1 2 3 2/1.5 1/0.5 1/2') },
-  { id: 'jb', name: '铃儿响叮当', sub: '副歌，五指不挪手', notes: parse('3 3 3/2 3 3 3/2 3 5 1/1.5 2/0.5 3/4 4 4 4/1.5 4/0.5 4 3 3 3/0.5 3/0.5 3 2 2 3 2/2 5/2 3 3 3/2 3 3 3/2 3 5 1/1.5 2/0.5 3/4 4 4 4/1.5 4/0.5 4 3 3 3/0.5 3/0.5 5 5 4 2 1/4') },
-  { id: 'tw', name: '小星星', sub: '要挪手：会弹到 la', notes: parse('1 1 5 5 6 6 5/2 4 4 3 3 2 2 1/2 5 5 4 4 3 3 2/2 5 5 4 4 3 3 2/2 1 1 5 5 6 6 5/2 4 4 3 3 2 2 1/2'),
-    fing: '1 1 5 5 5 5 4 3 3 2 2 1 1 1 5 5 4 4 3 3 2 5 5 4 4 3 3 2 1 1 5 5 5 5 4 3 3 2 2 1 1 1',
-    lyric: '一闪一闪亮晶晶满天都是小星星挂在天上放光明好像许多小眼睛一闪一闪亮晶晶满天都是小星星' },
-  { id: 'tg', name: '两只老虎', sub: '要挪手：有低音 sol', notes: parse('1 2 3 1 1 2 3 1 3 4 5/2 3 4 5/2 5/0.5 6/0.5 5/0.5 4/0.5 3 1 5/0.5 6/0.5 5/0.5 4/0.5 3 1 1 5, 1/2 1 5, 1/2'),
-    fing: '1 2 3 1 1 2 3 1 3 4 5 3 4 5 4 5 4 3 2 1 4 5 4 3 2 1 1 1 4 4 1 4',
-    lyric: '两只老虎两只老虎跑得快跑得快一只没有耳朵一只没有尾巴真奇怪真奇怪' },
-  { id: 'free', name: '自由弹', sub: '看看听到了什么', notes: [] }
-];
+const octWord = m => m >= 72 ? '高音 ' : m < 60 ? '低音 ' : '';
+const fullName = m => octWord(m) + nm(m, 'sol') + '（' + nm(m, 'abc').replace(/\d/, '') + '）';
 const FN = ['', '拇指', '食指', '中指', '无名指', '小指'];
-// 指法：有 fing 用 fing；否则按 C 位（C4=1 … G4=5）。再算出每个音时拇指在哪个白键，拇指位置变了就是挪手。
-SONGS.forEach(sg => {
-  const f = sg.fing ? sg.fing.split(' ').map(Number) : null;
-  let prevA = null;
-  sg.notes.forEach((n, i) => {
-    n.f = f ? f[i] : ([60, 62, 64, 65, 67].indexOf(n.m) + 1 || null);
-    const w = whites.indexOf(n.m);
-    n.anchor = n.f && w >= 0 ? w - (n.f - 1) : prevA;
-    n.shift = i > 0 && prevA !== null && n.anchor !== prevA;
-    prevA = n.anchor;
-  });
-});
-// 右手投影在键盘上：五个指尖落在当前手位的五个白键上（右手：拇指在左，小指在右）
+
+// 简谱数字 -> midi，C 大调；'5,' 低八度，"1'" 高八度
+const deg = { '1': 60, '2': 62, '3': 64, '4': 65, '5': 67, '6': 69, '7': 71 };
+const parseJianpu = s => s.trim().split(/\s+/).map(t => { const [d, b] = t.split('/'); let m = deg[d[0]]; if (d.includes(',')) m -= 12; if (d.includes("'")) m += 12; return { m, b: +(b || 1) }; });
+
+// —— 键盘上的右手（2D；3D 绑骨手加载好就用 3D） ——
 let hand = { anchor: null, finger: null }, h3d = null; // h3d: 3D 绑骨手（hand3d/），加载不了就用 2D
 const TIP = [0.74, 0.63, 0.61, 0.63, 0.68], ROT = [-22, -4, 0, 3, 7];
 function drawHand(anchor, finger) {
@@ -378,133 +409,382 @@ function buildKb() {
 window.__hand3dHost = { off: /[?&]hand=2d/.test(location.search), whiteKeys: NW, container: () => $('handov'), keyboardHeight: () => kb.clientHeight,
   attach: h => { h3d = h; const a = hand.anchor, f = hand.finger; drawHand(null); drawHand(a, f); } };
 
-// 状态
-let song = SONGS[0], idx = 0, okFirst = 0, bad = 0, triedWrong = false, finished = false, t0 = 0;
-let best = {}; try { best = JSON.parse(localStorage.getItem('pianoEarBest') || '{}'); } catch (e) {}
-const saveBest = () => { try { localStorage.setItem('pianoEarBest', JSON.stringify(best)); } catch (e) {} };
-
-function renderSongs() {
-  $('songs').innerHTML = SONGS.map(s => `<button class="song" data-id="${s.id}" aria-pressed="${s === song}">${s.name}<small>${s.sub}</small></button>`).join('');
+// —— 存档 ——
+let store = { best: {}, last: null, opts: {}, unlockAll: false };
+try { const s = JSON.parse(localStorage.getItem('pianoEarV7') || 'null'); if (s) store = Object.assign(store, s); else { const old = JSON.parse(localStorage.getItem('pianoEarBest') || '{}'); Object.keys(old).forEach(k => store.best[k] = { R: old[k] }); } } catch (e) {}
+const save = () => { try { localStorage.setItem('pianoEarV7', JSON.stringify(store)); } catch (e) {} };
+const starsOf = pct => pct == null ? 0 : pct >= 90 ? 3 : pct >= 70 ? 2 : pct >= 40 ? 1 : 0;
+function lessonStars(ls) {
+  const b = store.best[ls.id] || {}; let s = 0;
+  Object.keys(b).forEach(h => { let v = starsOf(b[h]); if (ls.hands === 'RL' && h !== 'RL') v = Math.min(v, 2); s = Math.max(s, v); });
+  return s;
 }
-function setSong(s) { song = s; renderSongs(); reset(); }
+const starTxt = n => '★'.repeat(n) + '☆'.repeat(3 - n);
+
+// —— 课程表 ——
+let CUR = null, ORDER = [], cur = null; // cur: { ls, L }
+const cache = {};
+async function prepare(ls) {
+  if (cache[ls.id]) return cache[ls.id];
+  let d;
+  if (ls.kind === 'beyer') {
+    const xml = await fetch('lessons/' + ls.file + '?v=' + VER).then(r => { if (!r.ok) throw new Error('乐谱读不到：' + ls.file); return r.text(); });
+    const sc = Score.parseMusicXML(xml);
+    const ev = sc.notes.map(n => ({ m: n.m, t: n.t, d: n.d, measure: n.measure, f: n.f, hand: n.staff === 2 ? 'L' : 'R' }));
+    ['R', 'L'].forEach(h => Score.assignFingers(ev.filter(e => e.hand === h), h));
+    d = { xml, events: ev, measures: sc.measures, tempo: sc.tempo || 100, words: sc.words };
+    if (ls.accomp) d.accomp = Score.simpleAccomp(ev, sc.measures);
+  } else if (ls.kind === 'song') {
+    let t = 0; const ev = parseJianpu(ls.jianpu).map((n, i) => { const e = { m: n.m, t, d: n.b, measure: Math.floor(t / 4) + 1, hand: ls.hands, tip: ls.tips && ls.tips[i], lyric: ls.lyric && ls.lyric[i] }; t += n.b; return e; });
+    if (ls.fing) ls.fing.split(' ').forEach((f, i) => { if (ev[i]) ev[i].f = +f; });
+    Score.assignFingers(ev, ls.hands);
+    const measures = []; for (let k = 0; k * 4 < t; k++) measures.push({ n: k + 1, t: k * 4, len: 4, beats: 4, beatType: 4 });
+    d = { events: ev, measures, tempo: 100 };
+  } else if (ls.kind === 'find') {
+    const ev = []; ls.groups.forEach((g, i) => g.forEach(m => ev.push({ m, t: i * 2, d: 2, measure: i + 1, hand: 'R', any: true })));
+    d = { events: ev, measures: ls.groups.map((g, i) => ({ n: i + 1, t: i * 2, len: 2, beats: 2, beatType: 4 })), tempo: 80, find: true };
+  } else d = { events: [], measures: [], tempo: 100 };
+  cache[ls.id] = d; return d;
+}
+
+// —— 练习设置（每课记住） ——
+let data = null, plan = null, opt = null;
+let idx = 0, okFirst = 0, bad = 0, triedWrong = false, finished = false, t0 = 0, hits = new Set();
+let beatStats = { on: 0, early: 0, late: 0 }, clock = null; // 跟拍模式
+const defaults = ls => ({ hands: ls.hands === 'RL' ? 'R' : (ls.hands || 'R'), mode: 'wait', tempo: ls.kind === 'beyer' ? 60 : 100, staff: (cur && cur.L.staff) || 'off', accomp: !!ls.accomp, from: null, to: null, loop: false });
+
+function makePlan() {
+  const ls = cur.ls, range = { from: opt.from || ls.from || null, to: opt.to || ls.to || null };
+  const hands = ls.kind === 'beyer' && ls.hands === 'RL' ? opt.hands : (ls.hands || 'R');
+  const p = Score.buildSteps(data.events, { from: range.from, to: range.to, hands });
+  p.hands = hands; p.from = range.from; p.to = range.to;
+  if (opt.accomp && data.accomp) p.auto = p.auto.concat(data.accomp.filter(e => (range.from == null || e.measure >= range.from) && (range.to == null || e.measure <= range.to)));
+  p.auto.sort((a, b) => a.t - b.t);
+  let lastR = null, lastL = null;
+  p.steps.forEach(st => {
+    st.any = st.notes.some(n => n.any);
+    const r = st.notes.find(n => n.hand === 'R'), l = st.notes.find(n => n.hand === 'L');
+    st.shiftR = !!(r && lastR !== null && r.base !== lastR); st.shiftL = !!(l && lastL !== null && l.base !== lastL);
+    if (r) lastR = r.base; if (l) lastL = l.base;
+    st.anchorR = r ? r.base - winBase : (lastR !== null ? lastR - winBase : null);
+  });
+  // 范围里所有音（含另一只手）定键盘窗口
+  const all = data.events.filter(e => (range.from == null || e.measure >= range.from) && (range.to == null || e.measure <= range.to));
+  p.lastT = all.length ? Math.max(...all.map(e => e.t + e.d)) : 0;
+  return p;
+}
+function fitWindow() {
+  const ev = data.events; if (!ev.length) { setWindow(Score.whiteNo(53)); return; }
+  const lo = Math.min(...ev.map(e => Score.whiteNo(e.m))), hi = Math.max(...ev.map(e => Score.whiteNo(e.m)));
+  let base = Math.min(lo, hi - (NW - 1));
+  for (let k = 0; k <= 2; k++) { const b = base - k; if ((b % 7 === 0 || b % 7 === 3) && b + NW - 1 >= hi) { base = b; break; } }
+  setWindow(base);
+}
+
+async function openLesson(id) {
+  const e = ORDER.find(x => x.ls.id === id) || ORDER[0]; if (!e) return;
+  cur = e; store.last = e.ls.id; save();
+  renderMap(); renderInfo();
+  $('say').textContent = '准备中…'; $('hint').textContent = '';
+  try { data = await prepare(e.ls); } catch (err) { $('say').textContent = '这一课没加载出来'; $('hint').textContent = err.message + '。检查网络后刷新页面。'; return; }
+  if (cur !== e) return;
+  opt = Object.assign(defaults(e.ls), store.opts[e.ls.id] || {});
+  fitWindow(); hand.anchor = null; buildKb();
+  renderCtl(); reset();
+}
+const saveOpt = () => { store.opts[cur.ls.id] = opt; save(); };
 
 function reset() {
-  idx = 0; okFirst = 0; bad = 0; triedWrong = false; finished = false; t0 = 0;
-  $('doneBox').innerHTML = ''; $('fb').textContent = ''; $('fb').className = 'fb';
-  draw();
+  stopClock(); plan = makePlan();
+  idx = 0; okFirst = 0; bad = 0; triedWrong = false; finished = false; t0 = 0; hits = new Set(); beatStats = { on: 0, early: 0, late: 0 };
+  $('doneBox').innerHTML = ''; $('fb').textContent = ''; $('fb').className = 'fb'; $('tfb').textContent = ''; $('tfb').className = 'tfb';
+  draw(); showSheet();
 }
 
-function clearMarks() { Object.values(keyEls).forEach(el => el.classList.remove('target')); }
-function flash(m, cls) {
+// —— 地图和说明 ——
+function unlocked(e) {
+  if (store.unlockAll || e.L.always) return true;
+  const i = ORDER.indexOf(e); if (i <= 0) return true;
+  const prev = ORDER.slice(0, i).reverse().find(x => !x.L.always);
+  return !prev || lessonStars(prev.ls) >= 1 || !!store.best[e.ls.id];
+}
+function renderMap() {
+  if (!CUR) return;
+  $('map').innerHTML = CUR.levels.map(L => {
+    const done = L.lessons.filter(ls => lessonStars(ls) >= 1).length, open = cur && cur.L === L;
+    return `<details class="lv" ${open ? 'open' : ''}><summary><span>${L.title}</span><small>${L.stage} · ${done}/${L.lessons.length}</small></summary><div class="songs">` +
+      L.lessons.map(ls => { const e = ORDER.find(x => x.ls === ls), ok = unlocked(e), st = lessonStars(ls);
+        return `<button class="song${ok ? '' : ' locked'}" data-id="${ls.id}" aria-pressed="${cur && cur.ls === ls}" ${ok ? '' : 'aria-disabled="true"'}>${ls.title}<small>${ok ? (ls.sub || '') : '先拿一颗星解锁'}</small>${ls.kind === 'free' ? '' : `<span class="st">${starTxt(st)}</span>`}</button>`; }).join('') + '</div></details>';
+  }).join('');
+}
+function renderInfo() {
+  const { L, ls } = cur;
+  $('info').innerHTML = `<div class="lvtag">${L.stage}</div><b>${ls.title}</b>` + (L.concept ? `<p>${L.concept}</p>` : '') +
+    (L.steep ? `<p class="small"><span class="tag">原书难在</span>${L.steep}</p>` : '') + (L.scaffold ? `<p class="small"><span class="tag ok">这里这样帮你</span>${L.scaffold}</p>` : '');
+}
+function seg(id, val) { $(id).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === String(val))); }
+function renderCtl() {
+  const ls = cur.ls, beyer = ls.kind === 'beyer';
+  $('rowHands').hidden = !(beyer && ls.hands === 'RL'); seg('handSeg', opt.hands);
+  $('rowMode').hidden = ls.kind === 'free' || ls.kind === 'find'; seg('modeSeg', opt.mode);
+  $('tempo').value = opt.tempo; tempoTxt();
+  $('rowStaff').hidden = !beyer; seg('staffSeg', opt.staff);
+  $('rowBars').hidden = !beyer || !data.measures.length;
+  if (beyer) {
+    const a = ls.from || data.measures[0].n, b = ls.to || data.measures[data.measures.length - 1].n, o = [];
+    for (let k = a; k <= b; k++) o.push(`<option value="${k}">${k}</option>`);
+    $('fromSel').innerHTML = o.join(''); $('toSel').innerHTML = o.join('');
+    $('fromSel').value = opt.from || a; $('toSel').value = opt.to || b; $('loopChk').checked = !!opt.loop;
+  }
+  $('rowAcc').hidden = !data.accomp; $('accChk').checked = !!opt.accomp;
+  $('rowTempo').hidden = ls.kind === 'free' || ls.kind === 'find';
+}
+const bpm = () => Math.round((data && data.tempo || 100) * opt.tempo / 100);
+const spb = () => 60 / bpm();
+function tempoTxt() { $('tempoTxt').textContent = opt.tempo + '%（每分钟 ' + bpm() + ' 拍）'; }
+
+// —— 画面 ——
+function clearMarks() { Object.values(keyEls).forEach(el => el.classList.remove('target', 'target2')); }
+function flash(m, cls, h) {
   const el = keyEls[m]; if (!el) return;
   el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 380);
-  pressFinger(m, cls);
+  if (h !== 'L') pressFinger(m, cls);
 }
+const whiteDist = (a, b) => { let n = 0; const s = b > a ? 1 : -1; for (let m = a; m !== b; m += s) if (isW(m + s)) n += s; return n || s; };
 
 function draw() {
   clearMarks();
   $('sOk').textContent = okFirst; $('sBad').textContent = bad;
-  const b = best[song.id]; $('sBest').textContent = b != null ? b + '%' : '–';
-  lane.querySelectorAll('.blk').forEach(el => el.remove());
-  if (song.id === 'free') {
+  const b = (store.best[cur.ls.id] || {})[plan ? plan.hands : 'R']; $('sBest').textContent = b != null ? b + '%' : '–';
+  lane.querySelectorAll('.blk,.mline').forEach(el => el.remove());
+  lane.classList.toggle('noname', opt.staff === 'only');
+  if (cur.ls.kind === 'free') {
     $('say').innerHTML = '随便弹，看看我听到了什么';
     $('hint').textContent = '一次弹一个键。听到的音会在琴键上亮绿色，右边显示音名和音准。';
-    $('lyric').textContent = ''; $('prog').style.width = '0';
-    drawHand(null);
-    return;
+    $('lyric').textContent = ''; $('prog').style.width = '0'; drawHand(null); return;
   }
-  const N = song.notes.length;
-  $('prog').style.width = (idx / N * 100) + '%';
-  if (finished) { drawHand(null); return; }
-  const cur = song.notes[idx].m;
-  if (keyEls[cur]) keyEls[cur].classList.add('target');
-  const nt = song.notes[idx];
-  $('say').innerHTML = `弹 <em>${fullName(cur)}</em>` + (nt.f ? `，用 ${nt.f} 指（${FN[nt.f]}）` : '');
-  let tip = song.tips && song.tips[idx];
+  const S = plan.steps, N = S.length;
+  $('prog').style.width = (N ? idx / N * 100 : 0) + '%';
+  if (finished || !N) { drawHand(null); $('lyric').textContent = ''; return; }
+  const st = S[idx];
+  st.notes.forEach(n => { const el = keyEls[n.m]; if (el) el.classList.add(n.hand === 'L' ? 'target2' : 'target'); });
+  // 提示文字
+  const R = st.notes.filter(n => n.hand === 'R'), Lh = st.notes.filter(n => n.hand === 'L');
+  const part = (arr, who) => arr.length ? (who ? who + '弹 ' : '弹 ') + arr.map(n => `<em class="${n.hand === 'L' ? 'lh' : ''}">${fullName(n.m)}</em>` + (n.f ? `（${n.f} 指）` : '')).join(' + ') : '';
+  if (st.any) $('say').innerHTML = '弹红色键里的<em>任意一个</em>';
+  else if (R.length && Lh.length) $('say').innerHTML = part(R, '右手') + '，' + part(Lh, '左手');
+  else if (Lh.length) $('say').innerHTML = part(Lh, plan.hands === 'RL' ? '左手' : '') + (Lh.length === 1 && Lh[0].f ? `，左手${FN[Lh[0].f]}` : '');
+  else $('say').innerHTML = part(R, plan.hands === 'RL' ? '右手' : '') + (R.length === 1 && R[0].f ? `，${FN[R[0].f]}` : '');
+  let tip = st.notes[0].tip || (idx === 0 ? cur.ls.tip : '') || '';
   if (!tip) {
-    const prev = idx > 0 ? song.notes[idx - 1].m : null;
-    if (prev === null) tip = nt.f ? '摆好右手：拇指放在' + fullName(whites[nt.anchor]) + '，其余四指依次放在右边四个白键上（键盘上画的那只手）。' : '红色的键就是要弹的。中央 C 在中间那组两个黑键的左边。';
-    else if (nt.shift) tip = '挪手：整只手往' + (nt.anchor > song.notes[idx - 1].anchor ? '右' : '左') + '移，拇指换到' + fullName(whites[nt.anchor]) + '上（看键盘上的手）。';
-    else if (prev === cur) tip = '和上一个音一样，再弹一次。';
-    else { const d = whiteDist(prev, cur); tip = (d > 0 ? '往右 ' : '往左 ') + Math.abs(d) + ' 个白键。'; }
+    const prev = idx > 0 ? S[idx - 1] : null;
+    if (!prev) tip = st.anchorR !== null && R.length ? '摆好右手：拇指放在' + fullName(whites[st.anchorR] || st.notes[0].m) + '，其余四指依次放在右边四个白键上（键盘上画的那只手）。'
+      : Lh.length && Lh[0].base != null ? '摆好左手：小指放在' + fullName(Score.whiteMidi(Lh[0].base)) + '，拇指放在' + fullName(Score.whiteMidi(Lh[0].base + 4)) + '，左手的键是蓝色的。' : '红色的键就是要弹的。';
+    else if (st.shiftR) tip = '右手挪手：整只手往' + (st.anchorR > prev.anchorR ? '右' : '左') + '移，拇指换到' + fullName(whites[st.anchorR]) + '上（看键盘上的手）。';
+    else if (st.shiftL) tip = '左手换手位：看蓝色的键和音块上的指法。';
+    else if (st.notes.length === 1 && prev.notes.length === 1 && prev.notes[0].hand === st.notes[0].hand) {
+      const a = prev.notes[0].m, c = st.notes[0].m;
+      tip = a === c ? '和上一个音一样，再弹一次。' : (whiteDist(a, c) > 0 ? '往右 ' : '往左 ') + Math.abs(whiteDist(a, c)) + ' 个白键。';
+    } else if (Lh.length && R.length) tip = st.notes.length > 2 ? '几个键一起按下去。' : '两只手同时按下去。';
+    else tip = R.length ? '轮到右手。' : '轮到左手。';
+    if (prev && st.measure !== prev.measure && data.measures.length && opt.mode === 'beat') tip += ' 新的一小节。';
   }
-  $('hint').innerHTML = '';
-  if (nt.shift && song.tips && song.tips[idx]) tip = '挪手。' + tip;
   $('hint').textContent = tip;
-  if (nt.shift) $('hint').className = 'hint shift'; else $('hint').className = 'hint';
-  drawHand(nt.anchor, nt.f);
-  $('lyric').textContent = song.lyric ? song.lyric.slice(Math.max(0, idx - 3), idx) + '【' + song.lyric[idx] + '】' + song.lyric.slice(idx + 1, idx + 5) : '';
-  const laneH = lane.clientHeight || 100, step = Math.max(20, (laneH - 36) / 3); // compact lane: up to 4 upcoming notes, overlapping a little
-  for (let k = 0; k < 5 && idx + k < N && 4 + k * step + 32 <= laneH + 1; k++) {
-    const m = song.notes[idx + k].m, el = document.createElement('div');
-    el.className = 'blk ' + (isW(m) ? 'w' : 'b') + (k === 0 ? ' now' : '');
-    el.style.left = keyX(m) + '%'; el.style.bottom = (4 + k * step) + 'px'; el.style.opacity = 1 - k * 0.2; el.style.zIndex = 10 - k;
-    const fgr = song.notes[idx + k].f;
-    el.innerHTML = (fgr ? `<i class="fg">${fgr}</i>` : '') + `<span>${nm(m)}</span>`; lane.appendChild(el);
-  }
+  $('hint').className = 'hint' + (st.shiftR || st.shiftL ? ' shift' : '');
+  if (plan.hands === 'L' && !R.length) drawHand(null);
+  else if (st.anchorR !== null && st.anchorR >= 0 && st.anchorR <= NW - 5) drawHand(st.anchorR, R.length ? R[0].f : null); else drawHand(null);
+  $('lyric').textContent = st.notes[0].lyric ? plan.steps.slice(Math.max(0, idx - 3), idx).map(s => s.notes[0].lyric || '').join('') + '【' + st.notes[0].lyric + '】' + plan.steps.slice(idx + 1, idx + 5).map(s => s.notes[0].lyric || '').join('') : '';
+  // 音块：高度 = 时值；另一只手淡淡地画出来
+  const H = lane.clientHeight || 100, BEAT_PX = Math.max(18, (H - 8) / 4), tNow = st.t, tMax = tNow + (H - 6) / BEAT_PX;
+  const put = (n, ghost, now) => {
+    const y = (n.t - tNow) * BEAT_PX + 6; if (y > H) return;
+    const el = document.createElement('div');
+    el.className = 'blk ' + (isW(n.m) ? 'w' : 'b') + (n.hand === 'L' ? ' lh' : '') + (ghost ? ' ghost' : '') + (now ? ' now' : '');
+    el.style.left = keyX(n.m) + '%'; el.style.bottom = y + 'px'; el.style.height = Math.max(16, n.d * BEAT_PX - 3) + 'px';
+    el.innerHTML = ghost ? '' : (n.f ? `<i class="fg">${n.f}</i>` : '') + `<span class="nm">${nm(n.m)}</span>`;
+    lane.appendChild(el);
+  };
+  for (let k = idx; k < N && S[k].t <= tMax; k++) S[k].notes.forEach(n => put(n, false, k === idx && !hits.has(n.m)));
+  plan.auto.forEach(n => { if (n.hand !== 'A' && n.t >= tNow - 1e-6 && n.t <= tMax) put(n, true, false); });
+  if (cur.ls.kind === 'beyer') data.measures.forEach(ms => { if (ms.t > tNow + 1e-6 && ms.t <= tMax && (plan.to == null || ms.n <= plan.to)) { const ln = document.createElement('div'); ln.className = 'mline'; ln.style.bottom = ((ms.t - tNow) * BEAT_PX + 4) + 'px'; ln.innerHTML = `<span>${ms.n}</span>`; lane.appendChild(ln); } });
+  syncCursor();
 }
-const whiteDist = (a, b) => { let n = 0; const s = b > a ? 1 : -1; for (let m = a; m !== b; m += s) if (isW(m + s)) n += s; return n || s; };
 
-function onNote(m, src) {
+// —— 弹对、弹错 ——
+let autoHeard = [];
+function onNote(m, src, at) {
   $('heard').textContent = nm(m, 'abc') + ' · ' + nm(m, 'sol');
-  if (song.id === 'free' || finished) { flash(m, 'hit'); return; }
+  if (!cur || cur.ls.kind === 'free' || finished || !plan || !plan.steps.length) { flash(m, 'hit'); return; }
+  const st = plan.steps[idx], need = st.notes.map(n => n.m);
+  if (src === 'mic' && !need.includes(m) && autoHeard.some(a => ((a.m - m) % 12 === 0) && at >= a.from - 0.06 && at <= a.to)) return; // 是网页自己弹的伴奏
   if (!t0) t0 = performance.now();
-  const want = song.notes[idx].m, fb = $('fb');
-  if (m === want) {
-    flash(m, 'hit');
-    if (!triedWrong) okFirst++;
-    triedWrong = false; idx++;
-    fb.className = 'fb good'; fb.textContent = ['对了！', '很好', '对', '漂亮', '没错'][idx % 5];
-    if (idx >= song.notes.length) return finish();
-    draw();
+  const fb = $('fb');
+  let ok = need.includes(m);
+  if (!ok && src === 'mic' && need.length > 1 && need.some(x => (x - m) % 12 === 0)) ok = true; // 和音/八度：麦克风听到其中一个就算
+  if (ok) {
+    const nt = st.notes.find(n => n.m === m) || st.notes[0];
+    flash(m, 'hit', nt.hand);
+    hits.add(m);
+    const complete = st.any || src === 'mic' || need.every(x => hits.has(x));
+    if (!complete) { fb.className = 'fb good'; fb.textContent = '对，' + need.filter(x => !hits.has(x)).map(x => fullName(x)).join('、') + ' 也要按。'; draw(); return; }
+    stepDone(st, at);
   } else {
-    flash(m, 'miss'); bad++; triedWrong = true;
+    flash(m, 'miss', 'R'); bad++; triedWrong = true;
     fb.className = 'fb bad';
-    if ((m - want) % 12 === 0) fb.textContent = `音名对了，但${m > want ? '高' : '低'}了 ${Math.abs(m - want) / 12} 个八度。往${m > want ? '左' : '右'}找同样的键。`;
-    else { const d = whiteDist(m, want); fb.textContent = `你弹的是 ${fullName(m)}，要往${d > 0 ? '右' : '左'} ${Math.abs(d)} 个白键${isW(want) ? '' : '，是个黑键'}。`; }
+    if (st.any) fb.textContent = `你弹的是 ${fullName(m)}，找${need.length === 3 ? '三个' : '两个'}黑键那一组。`;
+    else { const want = need[0];
+      if ((m - want) % 12 === 0) fb.textContent = `音名对了，但${m > want ? '高' : '低'}了 ${Math.abs(m - want) / 12} 个八度。往${m > want ? '左' : '右'}找同样的键。`;
+      else { const d = whiteDist(m, want); fb.textContent = `你弹的是 ${fullName(m)}，要往${d > 0 ? '右' : '左'} ${Math.abs(d)} 个白键${isW(want) ? '' : '，是个黑键'}。`; } }
     $('sBad').textContent = bad;
   }
 }
-
-function finish() {
-  finished = true; clearMarks(); lane.querySelectorAll('.blk').forEach(el => el.remove());
-  const N = song.notes.length, pct = Math.round(okFirst / N * 100), sec = Math.round((performance.now() - t0) / 1000);
-  if (best[song.id] == null || pct > best[song.id]) { best[song.id] = pct; saveBest(); }
-  $('prog').style.width = '100%'; $('lyric').textContent = '';
-  $('say').textContent = '弹完了！'; $('hint').textContent = '';
-  const stars = pct >= 90 ? '★★★' : pct >= 70 ? '★★☆' : '★☆☆';
-  const next = pct >= 90 ? '可以换下一首了。' : '再弹一遍，记住红色的键在哪里，会越来越快。';
-  $('doneBox').innerHTML = `<div class="done"><b>${stars} ${pct}% 一次弹对</b><p style="margin:6px 0 0">${N} 个音，用了 ${sec} 秒，弹错 ${bad} 次。${next}</p></div>`;
+function stepDone(st, at) {
+  const c = getCtx(), now = at || c.currentTime, fb = $('fb');
+  if (!triedWrong) okFirst++;
+  triedWrong = false; hits = new Set();
+  if (opt.mode === 'beat') judgeBeat(st, now);
+  playAuto(st.t, idx + 1 < plan.steps.length ? plan.steps[idx + 1].t : plan.lastT, now);
+  idx++;
+  if (opt.mode !== 'beat') { fb.className = 'fb good'; fb.textContent = ['对了！', '很好', '对', '漂亮', '没错'][idx % 5]; }
+  if (idx >= plan.steps.length) return finish();
   draw();
 }
 
-// 声音合成（点按与示范）
+// —— 网页替你弹的那部分：另一只手 / 伴奏 ——
+function playAuto(t1, t2, at) {
+  const c = getCtx(), s = spb(), soft = listening ? 0.5 : 1;
+  plan.auto.forEach(n => {
+    if (n.t < t1 - 1e-6 || n.t >= t2 - 1e-6) return;
+    const when = Math.max(c.currentTime, at + (n.t - t1) * s);
+    tone(n.m, when, n.d * s * 0.92, (n.soft ? 0.09 : n.hand === 'A' ? 0.13 : 0.2) * soft, true);
+    autoHeard.push({ m: n.m, from: when, to: when + 0.4 });
+  });
+  autoHeard = autoHeard.filter(a => a.to > c.currentTime - 1);
+}
+
+// —— 跟拍模式：节拍器 + 早/晚/准 ——
+function startClock(at, tFirst) {
+  const s = spb(); clock = { zero: at - tFirst * s, next: Math.ceil(tFirst - 1e-6), timer: null };
+  const tick = () => {
+    if (!clock) return; const c = getCtx(), sNow = spb();
+    while (clock.zero + clock.next * sNow < c.currentTime + 0.25) {
+      const when = clock.zero + clock.next * sNow, ms = data.measures.find(x => Math.abs(x.t - clock.next) < 1e-6);
+      if (when > c.currentTime - 0.02) click(when, !!ms);
+      clock.next++;
+      if (clock.next > plan.lastT + 1) break;
+    }
+  };
+  tick(); clock.timer = setInterval(tick, 60);
+}
+function stopClock() { if (clock && clock.timer) clearInterval(clock.timer); clock = null; }
+function judgeBeat(st, now) {
+  const s = spb(), lat = listening ? 0.08 : 0.03;
+  if (!clock) { startClock(now - lat, st.t); $('tfb').className = 'tfb'; $('tfb').textContent = '节拍器开始了，跟着它弹'; return; }
+  const exp = clock.zero + st.t * s, dev = (now - lat - exp) / s, t = $('tfb');
+  if (dev > 1) { clock.zero += (now - lat - exp); t.className = 'tfb late'; t.textContent = '慢了一拍多，节拍器等你一下'; beatStats.late++; return; }
+  if (Math.abs(dev) <= 0.2) { beatStats.on++; t.className = 'tfb good'; t.textContent = '准 ●'; }
+  else if (dev < 0) { beatStats.early++; t.className = 'tfb early'; t.textContent = '早了一点 ◀'; }
+  else { beatStats.late++; t.className = 'tfb late'; t.textContent = '晚了一点 ▶'; }
+}
+
+function finish() {
+  finished = true; stopClock(); clearMarks(); lane.querySelectorAll('.blk,.mline').forEach(el => el.remove());
+  const N = plan.steps.length, pct = Math.round(okFirst / N * 100), sec = Math.round((performance.now() - t0) / 1000);
+  const id = cur.ls.id, h = plan.hands, b = store.best[id] = store.best[id] || {};
+  if (b[h] == null || pct > b[h]) b[h] = pct; save();
+  $('prog').style.width = '100%'; $('lyric').textContent = '';
+  $('say').textContent = '弹完了！'; $('hint').textContent = '';
+  let s = starsOf(pct); const capped = cur.ls.hands === 'RL' && h !== 'RL'; if (capped) s = Math.min(s, 2);
+  const beatLine = opt.mode === 'beat' ? `<p style="margin:6px 0 0">跟拍：准 ${beatStats.on} 次，早 ${beatStats.early} 次，晚 ${beatStats.late} 次。</p>` : '';
+  let next = '', btn = '';
+  const i = ORDER.indexOf(cur), nx = ORDER[i + 1];
+  if (pct < 70) { next = '再弹一遍，记住红色的键在哪里，会越来越快。'; btn = '<button class="btn" data-act="again">再来一遍</button>'; }
+  else if (capped && h === 'R') { next = '右手会了。下一步只弹左手，右手让我来弹。'; btn = '<button class="btn main" data-act="L">只弹左手</button>'; }
+  else if (capped && h === 'L') { next = '左手也会了。现在两只手一起来，可以先把速度调慢。'; btn = '<button class="btn main" data-act="RL">两只手一起</button>'; }
+  else if (opt.mode === 'wait' && cur.ls.kind === 'beyer') { next = '音都会了。试试跟拍模式，听着节拍器弹。'; btn = '<button class="btn main" data-act="beat">跟拍子弹</button>' + (nx ? '<button class="btn" data-act="next">下一课</button>' : ''); }
+  else if (nx) { next = '可以去下一课了。'; btn = '<button class="btn main" data-act="next">下一课：' + nx.ls.title + '</button>'; }
+  $('doneBox').innerHTML = `<div class="done"><b>${starTxt(s)} ${pct}% 一次弹对</b><p style="margin:6px 0 0">${N} 步，用了 ${sec} 秒，弹错 ${bad} 次。${next}</p>${beatLine}<div class="row" style="margin-top:10px">${btn}</div></div>`;
+  renderMap(); draw();
+  if (opt.loop && pct >= 0 && cur.ls.kind === 'beyer') setTimeout(() => { if (finished) reset(); }, 2500);
+}
+$('doneBox').onclick = e => {
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const v = a.dataset.act;
+  if (v === 'again') reset();
+  else if (v === 'L' || v === 'RL') { opt.hands = v; saveOpt(); renderCtl(); reset(); }
+  else if (v === 'beat') { opt.mode = 'beat'; saveOpt(); renderCtl(); reset(); }
+  else if (v === 'next') { const nx = ORDER[ORDER.indexOf(cur) + 1]; if (nx) openLesson(nx.ls.id); }
+};
+
+// —— 五线谱（OpenSheetMusicDisplay，开源 BSD），放在“谱架”上 ——
+let osmd = null, osmdKey = '', osmdLoad = null;
+function loadOSMD() {
+  if (window.opensheetmusicdisplay) return Promise.resolve();
+  if (!osmdLoad) osmdLoad = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.3.1/build/opensheetmusicdisplay.min.js'; s.onload = res; s.onerror = () => { osmdLoad = null; rej(new Error('五线谱组件加载不了')); }; document.head.appendChild(s); });
+  return osmdLoad;
+}
+async function showSheet() {
+  const desk = $('desk');
+  if (!cur || cur.ls.kind !== 'beyer' || opt.staff === 'off') { desk.hidden = true; return; }
+  desk.hidden = false; desk.className = 'desk ' + opt.staff;
+  const key = cur.ls.file + ':' + plan.from + '-' + plan.to;
+  try {
+    await loadOSMD();
+    if (!osmd) osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay($('sheet'), { autoResize: false, backend: 'svg', drawTitle: false, drawSubtitle: false, drawComposer: false, drawLyricist: false, drawPartNames: false, drawCredits: false, drawMetronomeMarks: false, renderSingleHorizontalStaffline: true, followCursor: false });
+    if (osmdKey !== key) {
+      $('sheetMsg').textContent = '五线谱加载中…';
+      await osmd.load(data.xml);
+      osmd.setOptions({ drawFromMeasureNumber: plan.from || 1, drawUpToMeasureNumber: plan.to || Number.MAX_SAFE_INTEGER });
+      osmd.zoom = innerWidth < 700 ? 0.62 : 0.8;
+      osmd.render(); osmd.cursor.show(); osmd.cursor.reset(); osmdKey = key;
+      $('sheetMsg').textContent = '';
+    }
+    syncCursor();
+  } catch (e) { $('sheetMsg').textContent = '五线谱没显示出来（' + (e.message || e) + '），先看下面的音块。'; console.warn(e); }
+}
+function syncCursor() {
+  if (!osmd || !osmd.cursor || $('desk').hidden || !plan || !plan.steps[idx]) return;
+  const T = plan.steps[idx].t, c = osmd.cursor;
+  try {
+    const at = () => c.Iterator.currentTimeStamp.RealValue * 4;
+    if (at() > T + 1e-6) c.reset();
+    let g = 0; while (!c.Iterator.EndReached && at() < T - 1e-6 && g++ < 4000) c.next();
+    const el = c.cursorElement, box = $('sheet');
+    if (el) box.scrollTo({ left: Math.max(0, el.offsetLeft - box.clientWidth * 0.3), behavior: 'smooth' });
+  } catch (e) {}
+}
+
+// —— 声音合成（点按、示范、伴奏、节拍器） ——
 let ctx = null, muteUntil = 0;
 const getCtx = () => { if (!ctx) { const AC = window.AudioContext || window.webkitAudioContext; ctx = new AC(); } if (ctx.state === 'suspended') ctx.resume().catch(() => {}); return ctx; };
-function tone(m, when, dur) {
-  const c = getCtx(), f = 440 * 2 ** ((m - 69) / 12), g = c.createGain(), t = when || c.currentTime;
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0008, t + (dur || 0.9) + 0.4);
+function tone(m, when, dur, vol, noMute) {
+  const c = getCtx(), f = 440 * 2 ** ((m - 69) / 12), g = c.createGain(), t = when || c.currentTime, d = dur || 0.9;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.3, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0008, t + d + 0.4);
   g.connect(c.destination);
-  [[1, 1], [2, 0.45], [3, 0.2], [4, 0.1]].forEach(([k, a]) => { const o = c.createOscillator(), og = c.createGain(); o.frequency.value = f * k; og.gain.value = a; o.connect(og).connect(g); o.start(t); o.stop(t + (dur || 0.9) + 0.5); });
-  muteUntil = Math.max(muteUntil, t + (dur || 0.9) + 0.5);
+  [[1, 1], [2, 0.45], [3, 0.2], [4, 0.1]].forEach(([k, a]) => { const o = c.createOscillator(), og = c.createGain(); o.frequency.value = f * k; og.gain.value = a; o.connect(og).connect(g); o.start(t); o.stop(t + d + 0.5); });
+  if (!noMute) muteUntil = Math.max(muteUntil, t + d + 0.5);
 }
-kb.addEventListener('pointerdown', e => { const k = e.target.closest('[data-m]'); if (!k) return; e.preventDefault(); const m = +k.dataset.m; tone(m, 0, 0.6); onNote(m, 'tap'); });
-kb.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const k = e.target.closest('[data-m]'); if (k) { e.preventDefault(); tone(+k.dataset.m, 0, 0.6); onNote(+k.dataset.m, 'tap'); } } });
+function click(when, strong) {
+  const c = getCtx(), o = c.createOscillator(), g = c.createGain();
+  o.frequency.value = strong ? 1600 : 1100; g.gain.setValueAtTime(0.0001, when); g.gain.exponentialRampToValueAtTime(strong ? 0.25 : 0.14, when + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+  o.connect(g).connect(c.destination); o.start(when); o.stop(when + 0.06);
+}
+kb.addEventListener('pointerdown', e => { const k = e.target.closest('[data-m]'); if (!k) return; e.preventDefault(); const m = +k.dataset.m; tone(m, 0, 0.6, 0.3, true); onNote(m, 'tap', getCtx().currentTime); });
+kb.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const k = e.target.closest('[data-m]'); if (k) { e.preventDefault(); tone(+k.dataset.m, 0, 0.6, 0.3, true); onNote(+k.dataset.m, 'tap', getCtx().currentTime); } } });
 
 $('demoBtn').onclick = () => {
-  if (song.id === 'free') return;
-  const c = getCtx(); let t = c.currentTime + 0.1; const beat = 0.5;
-  const from = finished ? 0 : idx;
-  song.notes.slice(from, from + 16).forEach(n => {
-    tone(n.m, t, n.b * beat * 0.9);
-    if (h3d && n.f) { const ms = (t - c.currentTime) * 1000, lead = Math.min(200, ms); setTimeout(() => { if (n.anchor !== null) h3d.moveTo(n.anchor); h3d.highlight(null); h3d.play(n.f, { delay: lead / 1000, duration: n.b * beat * 0.9 }); }, ms - lead); }
-    t += n.b * beat;
-  });
-  if (h3d) setTimeout(() => { if (hand.anchor !== null) { h3d.moveTo(hand.anchor); h3d.highlight(hand.finger); } }, (t - c.currentTime) * 1000 + 400);
+  if (!plan || !plan.steps.length) return;
+  const c = getCtx(), s = spb(), from = finished ? 0 : idx, t1 = plan.steps[from].t, ms0 = data.measures.find(x => x.t <= t1 + 1e-6 && t1 < x.t + x.len - 1e-6), t2 = t1 + Math.max(8, 2 * (ms0 ? ms0.len : 4));
+  const start = c.currentTime + 0.15;
+  plan.steps.forEach(st => { if (st.t < t1 || st.t >= t2) return; const when = start + (st.t - t1) * s;
+    st.notes.forEach(n => { tone(n.m, when, n.d * s * 0.9);
+      if (h3d && n.hand === 'R' && n.f) { const ms = (when - c.currentTime) * 1000, lead = Math.min(200, ms); setTimeout(() => { if (st.anchorR !== null && st.anchorR >= 0 && st.anchorR <= NW - 5) h3d.moveTo(st.anchorR); h3d.highlight(null); h3d.play(n.f, { delay: lead / 1000, duration: n.d * s * 0.9 }); }, ms - lead); } }); });
+  plan.auto.forEach(n => { if (n.t >= t1 && n.t < t2) tone(n.m, start + (n.t - t1) * s, n.d * s * 0.9, n.soft ? 0.09 : 0.18); });
+  if (h3d) setTimeout(() => { if (hand.anchor !== null) { h3d.moveTo(hand.anchor); h3d.highlight(hand.finger); } }, (t2 - t1) * s * 1000 + 600);
   $('fb').className = 'fb'; $('fb').textContent = '示范播放时暂停听音。';
 };
 
-// 麦克风
+// —— 麦克风 ——
 let det = null, an = null, buf = null, listening = false;
 function micState(cls, txt) { const c = $('micChip'); c.className = 'chip ' + cls; $('micTxt').textContent = txt; }
 let asking = false;
@@ -527,7 +807,7 @@ function startMic() {
       const src = c.createMediaStreamSource(stream); an = c.createAnalyser(); an.fftSize = 2048; src.connect(an);
       buf = new Float32Array(an.fftSize);
       det = PitchCore(c.sampleRate, { refA4: refA4 });
-      det.on(ev => { if (c.currentTime < muteUntil) return; recent.push(ev.cents); if (recent.length > 8) recent.shift(); showCents(ev.cents); onNote(ev.midi, 'mic'); });
+      det.on(ev => { if (c.currentTime < muteUntil) return; recent.push(ev.cents); if (recent.length > 8) recent.shift(); showCents(ev.cents); onNote(ev.midi, 'mic', ev.t); });
       listening = true; $('micNote').hidden = true; micState('on', '正在听');
       diag('成功：拿到麦克风，声音状态 ' + c.state + '，采样率 ' + c.sampleRate);
       $('startBtn').hidden = true;
@@ -549,7 +829,7 @@ function startMic() {
 function diag(t) {
   let perm = '';
   const base = '安全连接 ' + (window.isSecureContext ? '是' : '否') + '；mediaDevices ' + (navigator.mediaDevices ? '有' : '无') + '；getUserMedia ' + (navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? '有' : '无') + '；AudioContext ' + (window.AudioContext || window.webkitAudioContext ? '有' : '无');
-  const show = () => { $('diag').textContent = '第 7 版。' + t + '。' + base + perm + '。' + navigator.userAgent; };
+  const show = () => { $('diag').textContent = '第 ' + VER + ' 版。' + t + '。' + base + perm + '。' + navigator.userAgent; };
   show();
   try { navigator.permissions.query({ name: 'microphone' }).then(r => { perm = '；麦克风权限 ' + r.state; show(); }, () => {}); } catch (e) {}
 }
@@ -583,24 +863,42 @@ $('calBtn').onclick = () => {
 $('calReset').onclick = () => setRef(440);
 setRef(refA4);
 
+// —— 按钮 ——
 $('startBtn').onclick = startMic;
 $('micChip').onclick = () => { if (!listening) startMic(); };
 kb.addEventListener('pointerdown', () => { if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {}); });
-$('resetBtn').onclick = reset;
-$('songs').onclick = e => { const b = e.target.closest('.song'); if (b) setSong(SONGS.find(s => s.id === b.dataset.id)); };
+$('resetBtn').onclick = () => reset();
+$('map').onclick = e => { const b = e.target.closest('.song'); if (!b) return; if (b.classList.contains('locked')) { $('fb').className = 'fb bad'; $('fb').textContent = '这一课还锁着：前一课拿到一颗星就解锁。下面也可以勾“全部解锁”。'; return; } openLesson(b.dataset.id); };
+$('unlockAll').onchange = e => { store.unlockAll = e.target.checked; save(); renderMap(); };
 $('labelSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; labelMode = b.dataset.l; $('labelSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); buildKb(); draw(); };
+const segClick = (id, key, after) => $(id).onclick = e => { const b = e.target.closest('button'); if (!b || !opt) return; opt[key] = b.dataset.v; seg(id, opt[key]); saveOpt(); after(); };
+segClick('handSeg', 'hands', reset);
+segClick('modeSeg', 'mode', reset);
+segClick('staffSeg', 'staff', () => { showSheet(); draw(); });
+$('tempo').oninput = e => { opt.tempo = +e.target.value; tempoTxt(); saveOpt(); };
+$('accChk').onchange = e => { opt.accomp = e.target.checked; saveOpt(); reset(); };
+const barsChange = () => { let a = +$('fromSel').value, b = +$('toSel').value; if (b < a) { b = a; $('toSel').value = b; } const ls = cur.ls; opt.from = a === (ls.from || data.measures[0].n) ? null : a; opt.to = b === (ls.to || data.measures[data.measures.length - 1].n) ? null : b; saveOpt(); reset(); };
+$('fromSel').onchange = barsChange; $('toSel').onchange = barsChange;
+$('loopChk').onchange = e => { opt.loop = e.target.checked; saveOpt(); };
+addEventListener('resize', () => { if (plan) draw(); });
 
 $('stage').style.setProperty('--nw', NW);
-buildKb(); renderSongs(); draw();
+$('unlockAll').checked = !!store.unlockAll;
+buildKb();
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) micFail(NO_API);
+fetch('lessons/curriculum.json?v=' + VER).then(r => r.json()).then(c => {
+  CUR = c; ORDER = []; c.levels.forEach(L => L.lessons.forEach(ls => ORDER.push({ ls, L })));
+  openLesson(store.last && ORDER.some(x => x.ls.id === store.last) ? store.last : ORDER[0].ls.id);
+}).catch(e => { $('say').textContent = '课程表没加载出来'; $('hint').textContent = '检查网络后刷新页面。（' + e.message + '）'; });
+window.__pe = { get plan() { return plan; }, get idx() { return idx; }, get cur() { return cur; }, onNote, openLesson, get opt() { return opt; }, get finished() { return finished; } };
 }
 </script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 <script type="module">
 // 3D 绑骨右手：hand3d/piano-hand.js + right-hand.glb。WebGL 或网络不行就继续用 2D 手。
 const host = window.__hand3dHost;
-if (host && !host.off) import('./hand3d/piano-hand.js?v=7')
-  .then(({ PianoHand }) => PianoHand.create({ container: host.container(), whiteKeys: host.whiteKeys, keyboardHeight: host.keyboardHeight, glbUrl: './hand3d/right-hand.glb?v=7' }))
+if (host && !host.off) import('./hand3d/piano-hand.js?v=8')
+  .then(({ PianoHand }) => PianoHand.create({ container: host.container(), whiteKeys: host.whiteKeys, keyboardHeight: host.keyboardHeight, glbUrl: './hand3d/right-hand.glb?v=8' }))
   .then(h => host.attach(h))
   .catch(e => console.warn('3D 手没有加载，用 2D 手：', e));
 </script>
