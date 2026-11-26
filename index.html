@@ -220,7 +220,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
       <summary>麦克风诊断</summary>
       <p class="small" id="diag" style="overflow-wrap:anywhere">点“开始听”之后这里会显示检查结果。</p>
     </details>
-    <p class="small">手机放在谱架上，离琴 30 到 50 厘米，琴的音量开到中等。只能听一个一个的单音，和弦还不行。点屏幕上的琴键也算弹，没有麦克风时可以这样先熟悉。</p>
+    <p class="small">手机放在谱架上，离琴 30 到 50 厘米，琴的音量开到中等。麦克风一次只听一个音：双手同时弹或和音时，听到其中一个就算对。点屏幕上的琴键也算弹（要全部点到），没有麦克风时可以这样先熟悉。</p>
   </div>
 </aside>
 </div>
@@ -510,9 +510,10 @@ function unlocked(e) {
 }
 function renderMap() {
   if (!CUR) return;
+  const wasOpen = new Set([...$('map').querySelectorAll('details[open]')].map(d => d.dataset.lv));
   $('map').innerHTML = CUR.levels.map(L => {
     const done = L.lessons.filter(ls => lessonStars(ls) >= 1).length, open = cur && cur.L === L;
-    return `<details class="lv" ${open ? 'open' : ''}><summary><span>${L.title}</span><small>${L.stage} · ${done}/${L.lessons.length}</small></summary><div class="songs">` +
+    return `<details class="lv" data-lv="${L.id}" ${open || wasOpen.has(L.id) ? 'open' : ''}><summary><span>${L.title}</span><small>${L.stage} · ${done}/${L.lessons.length}</small></summary><div class="songs">` +
       L.lessons.map(ls => { const e = ORDER.find(x => x.ls === ls), ok = unlocked(e), st = lessonStars(ls);
         return `<button class="song${ok ? '' : ' locked'}" data-id="${ls.id}" aria-pressed="${cur && cur.ls === ls}" ${ok ? '' : 'aria-disabled="true"'}>${ls.title}<small>${ok ? (ls.sub || '') : '先拿一颗星解锁'}</small>${ls.kind === 'free' ? '' : `<span class="st">${starTxt(st)}</span>`}</button>`; }).join('') + '</div></details>';
   }).join('');
@@ -520,7 +521,7 @@ function renderMap() {
 function renderInfo() {
   const { L, ls } = cur;
   $('info').innerHTML = `<div class="lvtag">${L.stage}</div><b>${ls.title}</b>` + (L.concept ? `<p>${L.concept}</p>` : '') +
-    (L.steep ? `<p class="small"><span class="tag">原书难在</span>${L.steep}</p>` : '') + (L.scaffold ? `<p class="small"><span class="tag ok">这里这样帮你</span>${L.scaffold}</p>` : '');
+    (L.steep ? `<p class="small"><span class="tag">原书难在</span>${L.steep}</p>` : '') + (L.scaffold ? `<p class="small"><span class="tag ok">这里这样帮你</span>${L.scaffold}</p>` : '') + (ls.tip ? `<p class="small"><span class="tag ok">这一首</span>${ls.tip}</p>` : '');
 }
 function seg(id, val) { $(id).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === String(val))); }
 function renderCtl() {
@@ -575,7 +576,7 @@ function draw() {
   else if (R.length && Lh.length) $('say').innerHTML = part(R, '右手') + '，' + part(Lh, '左手');
   else if (Lh.length) $('say').innerHTML = part(Lh, plan.hands === 'RL' ? '左手' : '') + (Lh.length === 1 && Lh[0].f ? `，左手${FN[Lh[0].f]}` : '');
   else $('say').innerHTML = part(R, plan.hands === 'RL' ? '右手' : '') + (R.length === 1 && R[0].f ? `，${FN[R[0].f]}` : '');
-  let tip = st.notes[0].tip || (idx === 0 ? cur.ls.tip : '') || '';
+  let tip = st.notes[0].tip || '';
   if (!tip) {
     const prev = idx > 0 ? S[idx - 1] : null;
     if (!prev) tip = st.anchorR !== null && R.length ? '摆好右手：拇指放在' + fullName(whites[st.anchorR] || st.notes[0].m) + '，其余四指依次放在右边四个白键上（键盘上画的那只手）。'
@@ -868,7 +869,7 @@ $('startBtn').onclick = startMic;
 $('micChip').onclick = () => { if (!listening) startMic(); };
 kb.addEventListener('pointerdown', () => { if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {}); });
 $('resetBtn').onclick = () => reset();
-$('map').onclick = e => { const b = e.target.closest('.song'); if (!b) return; if (b.classList.contains('locked')) { $('fb').className = 'fb bad'; $('fb').textContent = '这一课还锁着：前一课拿到一颗星就解锁。下面也可以勾“全部解锁”。'; return; } openLesson(b.dataset.id); };
+$('map').onclick = e => { const b = e.target.closest('.song'); if (!b) return; if (b.classList.contains('locked')) { $('fb').className = 'fb bad'; $('fb').textContent = '这一课还锁着：前一课拿到一颗星就解锁。下面也可以勾“全部解锁”。'; return; } openLesson(b.dataset.id); if (innerWidth < 900) $('stage').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
 $('unlockAll').onchange = e => { store.unlockAll = e.target.checked; save(); renderMap(); };
 $('labelSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; labelMode = b.dataset.l; $('labelSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); buildKb(); draw(); };
 const segClick = (id, key, after) => $(id).onclick = e => { const b = e.target.closest('button'); if (!b || !opt) return; opt[key] = b.dataset.v; seg(id, opt[key]); saveOpt(); after(); };
