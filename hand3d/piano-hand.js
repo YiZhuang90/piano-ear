@@ -196,7 +196,12 @@ export class PianoHand {
     if (!gl) throw new Error('WebGL2 not available');
     const url = opts.glbUrl || new URL('./right-hand.glb', import.meta.url).href;
     const gltf = await new GLTFLoader().loadAsync(url);
-    return new PianoHand(opts, gltf.scene, c);
+    const hand = new PianoHand(opts, gltf.scene, c);
+    // draw one frame and make sure every shader compiled, so the caller can fall back if not
+    hand.rig.update(0.016); hand.renderer.render(hand.scene, hand.camera);
+    const bad = hand.renderer.info.programs.find(p => p.diagnostics && !p.diagnostics.runnable);
+    if (bad) { hand.dispose(); throw new Error('shader failed to compile'); }
+    return hand;
   }
   constructor({ container, whiteKeys = 12, keyboardHeight, labels = true, pose, shadows = true, maxPixelRatio = 2, keyLength = 5.6 }, model, canvas) {
     this.container = container; this.prefL = keyLength; this.NW = whiteKeys; this.kbH = keyboardHeight || (() => container.clientHeight);
@@ -270,6 +275,13 @@ export class PianoHand {
         b.classList.toggle('on', f === this.rig.highlighted);
       }
     }
+  }
+  // Move the canvas and finger numbers into a new container (for pages that rebuild their keyboard).
+  attach(container) {
+    if (container === this.container) return;
+    this.ro.unobserve(this.container); this.container = container;
+    container.appendChild(this.renderer.domElement); this.badges.forEach(b => b && container.appendChild(b));
+    this.ro.observe(container); this.resize();
   }
   moveTo(anchor, o) { this.rig.moveTo(anchor, o); }
   highlight(f) { this.rig.highlight(f); }

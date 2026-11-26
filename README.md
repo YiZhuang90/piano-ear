@@ -7,3 +7,4 @@
 - `test-detector.js`：用合成钢琴音离线测试，`node test-detector.js`。
 
 只识别单音，不识别和弦。麦克风需要 https 才能用，所以放在 GitHub Pages 上。
+- `hand3d/`：3D 绑骨右手（模型、动作模块、演示页），可单独复用，见 hand3d/README.md。

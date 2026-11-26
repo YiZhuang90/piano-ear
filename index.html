@@ -49,6 +49,7 @@ h1{font-size:clamp(30px,5vw,44px);line-height:1.05;letter-spacing:-.02em;font-we
 .fgr.pr{background:rgba(22,133,90,.7)}
 .palm{position:absolute;bottom:0;height:46px;border-radius:14px 14px 22px 22px;background:rgba(232,180,140,.58);border:1.5px solid rgba(255,236,218,.9);border-top:0;transition:left .35s;color:#f1efe9;font-size:12px;display:grid;place-items:center;box-sizing:border-box}
 .kb.withhand{margin-bottom:66px}
+.handov.h3d .fgr,.handov.h3d .palm{display:none}
 .shift{color:#f6c344}
 .felt{height:6px;background:var(--felt);margin:0 -2px}
 .kb{position:relative;display:flex;height:clamp(130px,22vw,190px);user-select:none;-webkit-user-select:none;touch-action:manipulation}
@@ -105,7 +106,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="wrap">
 <div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 4 版</span></h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 5 版</span></h1>
   <div class="row" style="align-items:center">
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
     <button class="btn main" id="startBtn" type="button">开始听</button>
@@ -338,12 +339,13 @@ SONGS.forEach(sg => {
   });
 });
 // 右手投影在键盘上：五个指尖落在当前手位的五个白键上（右手：拇指在左，小指在右）
-let hand = { anchor: null };
+let hand = { anchor: null, finger: null }, h3d = null; // h3d: 3D 绑骨手（hand3d/），加载不了就用 2D
 const TIP = [0.74, 0.63, 0.61, 0.63, 0.68], ROT = [-22, -4, 0, 3, 7];
 function drawHand(anchor, finger) {
   const ov = $('handov');
   if (anchor === null || anchor === undefined) { ov.hidden = true; kb.classList.remove('withhand'); hand.anchor = null; return; }
-  ov.hidden = false; kb.classList.add('withhand'); hand.anchor = anchor;
+  ov.hidden = false; kb.classList.add('withhand'); hand.anchor = anchor; hand.finger = finger;
+  if (h3d) { ov.classList.add('h3d'); h3d.moveTo(anchor); h3d.highlight(finger); return; }
   const W = 100 / NW;
   if (!ov.children.length) ov.innerHTML = [1, 2, 3, 4, 5].map(f => `<div class="fgr" data-f="${f}"><i>${f}</i></div>`).join('') + '<div class="palm">右手</div>';
   ov.querySelectorAll('.fgr').forEach(el => {
@@ -356,9 +358,10 @@ function drawHand(anchor, finger) {
   const pm = ov.querySelector('.palm');
   pm.style.left = ((anchor + 0.55) * W) + '%'; pm.style.width = (4.25 * W) + '%';
 }
-function pressFinger(m) {
+function pressFinger(m, cls) {
   if (hand.anchor === null) return;
   const f = whites.indexOf(m) - hand.anchor + 1; if (f < 1 || f > 5) return;
+  if (h3d) { h3d.press(f, { color: cls === 'miss' ? 'miss' : 'ok' }); return; }
   const el = $('handov').querySelector(`.fgr[data-f="${f}"]`); if (!el) return;
   el.classList.add('pr'); setTimeout(() => el.classList.remove('pr'), 380);
 }
@@ -369,7 +372,11 @@ function buildKb() {
   kb.innerHTML = whites.map(m => `<button class="wk" data-m="${m}" aria-label="${fullName(m)}">${m === 60 ? '<span class="mc">中央C</span>' : ''}<b>${nm(m)}</b></button>`).join('') +
     Array.from({ length: HIGH - LOW + 1 }, (_, i) => LOW + i).filter(m => !isW(m)).map(m => `<button class="bk" data-m="${m}" style="left:${keyX(m)}%" aria-label="${nm(m, 'abc')}"></button>`).join('') + '<div class="handov" id="handov" hidden aria-hidden="true"></div>';
   keyEls = {}; kb.querySelectorAll('[data-m]').forEach(el => keyEls[el.dataset.m] = el);
+  if (h3d) h3d.attach($('handov'));
 }
+// 3D 手加载好以后接上（页面底部的 module 脚本调用）；地址加 ?hand=2d 可以只用 2D
+window.__hand3dHost = { off: /[?&]hand=2d/.test(location.search), whiteKeys: NW, container: () => $('handov'), keyboardHeight: () => kb.clientHeight,
+  attach: h => { h3d = h; const a = hand.anchor, f = hand.finger; drawHand(null); drawHand(a, f); } };
 
 // 状态
 let song = SONGS[0], idx = 0, okFirst = 0, bad = 0, triedWrong = false, finished = false, t0 = 0;
@@ -391,7 +398,7 @@ function clearMarks() { Object.values(keyEls).forEach(el => el.classList.remove(
 function flash(m, cls) {
   const el = keyEls[m]; if (!el) return;
   el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 380);
-  pressFinger(m);
+  pressFinger(m, cls);
 }
 
 function draw() {
@@ -487,7 +494,12 @@ $('demoBtn').onclick = () => {
   if (song.id === 'free') return;
   const c = getCtx(); let t = c.currentTime + 0.1; const beat = 0.5;
   const from = finished ? 0 : idx;
-  song.notes.slice(from, from + 16).forEach(n => { tone(n.m, t, n.b * beat * 0.9); t += n.b * beat; });
+  song.notes.slice(from, from + 16).forEach(n => {
+    tone(n.m, t, n.b * beat * 0.9);
+    if (h3d && n.f) { const ms = (t - c.currentTime) * 1000, lead = Math.min(200, ms); setTimeout(() => { if (n.anchor !== null) h3d.moveTo(n.anchor); h3d.highlight(null); h3d.play(n.f, { delay: lead / 1000, duration: n.b * beat * 0.9 }); }, ms - lead); }
+    t += n.b * beat;
+  });
+  if (h3d) setTimeout(() => { if (hand.anchor !== null) { h3d.moveTo(hand.anchor); h3d.highlight(hand.finger); } }, (t - c.currentTime) * 1000 + 400);
   $('fb').className = 'fb'; $('fb').textContent = '示范播放时暂停听音。';
 };
 
@@ -536,7 +548,7 @@ function startMic() {
 function diag(t) {
   let perm = '';
   const base = '安全连接 ' + (window.isSecureContext ? '是' : '否') + '；mediaDevices ' + (navigator.mediaDevices ? '有' : '无') + '；getUserMedia ' + (navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? '有' : '无') + '；AudioContext ' + (window.AudioContext || window.webkitAudioContext ? '有' : '无');
-  const show = () => { $('diag').textContent = '第 4 版。' + t + '。' + base + perm + '。' + navigator.userAgent; };
+  const show = () => { $('diag').textContent = '第 5 版。' + t + '。' + base + perm + '。' + navigator.userAgent; };
   show();
   try { navigator.permissions.query({ name: 'microphone' }).then(r => { perm = '；麦克风权限 ' + r.state; show(); }, () => {}); } catch (e) {}
 }
@@ -582,6 +594,12 @@ buildKb(); renderSongs(); draw();
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) micFail(NO_API);
 }
 </script>
-
-</body>
-</html>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+// 3D 绑骨右手：hand3d/piano-hand.js + right-hand.glb。WebGL 或网络不行就继续用 2D 手。
+const host = window.__hand3dHost;
+if (host && !host.off) import('./hand3d/piano-hand.js')
+  .then(({ PianoHand }) => PianoHand.create({ container: host.container(), whiteKeys: host.whiteKeys, keyboardHeight: host.keyboardHeight }))
+  .then(h => host.attach(h))
+  .catch(e => console.warn('3D 手没有加载，用 2D 手：', e));
+</script>
