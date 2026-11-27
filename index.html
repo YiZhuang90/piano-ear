@@ -543,25 +543,20 @@ let scrollKey = '', progScroll = 0;
 const kscroll = () => $('kscroll');
 function keyPx(m) { const kin = $('kinner'); return keyX(m) / 100 * kin.offsetWidth + kin.offsetLeft; }
 function fadeEdges() { const sc = kscroll(); if (!sc) return; $('kfadeL').classList.toggle('on', sc.scrollLeft > 4); $('kfadeR').classList.toggle('on', sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 4); }
-// 让 [a, b]（像素）露出来：放得下这一课的整个音域就把音域居中，否则把这一步居中
+// 把 [a, b]（像素）放到屏幕正中间：每一步都把要按的键居中
 function showRange(a, b, smooth) {
-  const sc = kscroll(), vw = sc.clientWidth, pad = KW * 0.8; if (!vw || sc.scrollWidth <= vw + 1) { fadeEdges(); return; }
-  const L = sc.scrollLeft;
-  if (a - pad >= L && b + pad <= L + vw) { fadeEdges(); return; }
-  let c = (a + b) / 2;
-  if (span) { const sa = keyPx(span[0]) - KW / 2, sb = keyPx(span[1]) + KW / 2; if (sb - sa + 2 * pad <= vw && sa <= a && sb >= b) c = (sa + sb) / 2; }
-  const left = Math.max(0, Math.min(sc.scrollWidth - vw, c - vw / 2));
+  const sc = kscroll(), vw = sc.clientWidth; if (!vw || sc.scrollWidth <= vw + 1) { fadeEdges(); return; }
+  const left = Math.round(Math.max(0, Math.min(sc.scrollWidth - vw, (a + b) / 2 - vw / 2)));
+  if (Math.abs(left - sc.scrollLeft) < 2) { fadeEdges(); return; }
   progScroll = performance.now();
   if (smooth && sc.scrollTo) sc.scrollTo({ left, behavior: 'smooth' }); else sc.scrollLeft = left;
   setTimeout(fadeEdges, smooth ? 400 : 0);
 }
 function scrollToStep(st) {
-  if (!st) { if (span) showRange(keyPx(span[0]) - KW / 2, keyPx(span[1]) + KW / 2, false); return; }
+  if (!st) { if (span) showRange(keyPx(span[0]), keyPx(span[1]), false); return; }
   const xs = st.notes.map(n => keyPx(n.m));
-  if (hand.anchor !== null && !(plan && plan.hands === 'L')) { const kin = $('kinner'), w = kin.offsetWidth / NW; xs.push(kin.offsetLeft + hand.anchor * w, kin.offsetLeft + (hand.anchor + 5) * w); }
-  showRange(Math.min(...xs) - KW / 2, Math.max(...xs) + KW / 2, scrollKey !== '');
+  showRange(Math.min(...xs), Math.max(...xs), scrollKey !== '');
 }
-
 async function openLesson(id) {
   const e = ORDER.find(x => x.ls.id === id) || ORDER[0]; if (!e) return;
   cur = e; store.last = e.ls.id; save();
