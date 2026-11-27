@@ -27,20 +27,20 @@
 
     // fr, on: 172 行 × 88 列（Float32Array 平铺，行优先）。tEnd: 窗口最后一个采样的时间（秒）。
     // level(t): 返回 t 附近 60 毫秒里的 {rms, floor}，用来挡掉安静时模型自己“脑补”出的音。
-    function feed(fr, on, tEnd, level) {
+    function feed(fr, on, tEnd, level, ct) {
       const t0 = tEnd - N / SR, dt = HOP / SR, jEnd = NF - 1 - K;
       let j0 = Math.max(1, Math.floor((lastT - t0) / dt) + 1);
       const out = [];
       for (let j = j0; j <= jEnd; j++) {
         const t = t0 + j * dt;
         if (t <= lastT + 1e-6) continue;
-        frame(fr, on, j, t, level, out);
+        frame(fr, on, j, t, level, out, ct);
       }
       lastT = Math.max(lastT, t0 + jEnd * dt);
       return out;
     }
     const at = (a, j, k) => a[j * 88 + k];
-    function frame(fr, on, j, t, level, out) {
+    function frame(fr, on, j, t, level, out, ct) {
       let cand = null;
       for (let k = 0; k < 88; k++) {
         const o = at(on, j, k);
@@ -83,9 +83,29 @@
       for (const c of keep) {
         lastEmit[c.m] = t;
         const ev = { type: 'note', midi: c.m, t, p: +c.o.toFixed(2), how: 'nn', expected: c.isE };
+        if (opt.feat) ev.feat = feats(fr, on, ct, j, c.m - LO, level ? level(t) : null);
         out.push(ev);
         listeners.forEach(fn => fn(ev));
       }
+    }
+    // 区分钢琴和人声用的特征：钢琴音高稳、起音陡；人声音高会滑、会抖
+    function feats(fr, on, ct, j, k, L) {
+      const F = {};
+      if (ct) {
+        let lo = 1e9, hi = -1e9, sharp = 0, n = 0;
+        for (let q = j; q <= Math.min(NF - 1, j + K); q++) {
+          let bi = -1, bv = -1;
+          for (let b = Math.max(0, 3 * k - 3); b <= Math.min(263, 3 * k + 5); b++) { const v = ct[q * 264 + b]; if (v > bv) { bv = v; bi = b; } }
+          lo = Math.min(lo, bi); hi = Math.max(hi, bi);
+          const side = Math.max(bi >= 2 ? ct[q * 264 + bi - 2] : 0, bi <= 261 ? ct[q * 264 + bi + 2] : 0);
+          sharp += bv / Math.max(side, 1e-3); n++;
+        }
+        F.drift = hi - lo; F.sharp = sharp / n; F.cbin = lo - 3 * k;
+      }
+      let act = 0; for (let kk = 0; kk < 88; kk++) if (at(fr, j + 2, kk) > 0.3) act++;
+      F.act = act;
+      if (L) { F.rise = L.rms / Math.max(L.prev, 1e-6); F.lvl = L.rms; if (L.hops) F.hops = L.hops; }
+      return F;
     }
     return {
       feed, setSens,
@@ -198,10 +218,42 @@ registerProcessor('pe-tap',Tap);`;
     return { tf, model, warm, stats: { backend: tf.getBackend(), loadMs: Math.round(performance.now() - t0), runMs: ms, test: test.a } };
   }
 
+  // 人声关：YAMNet（voicegate.js）说“有人在说话/唱歌”时，先把听到的音扣下，等看到这个音之后 0.3 秒的声音再定；
+  // 那时还是人声、不像钢琴，就丢掉。YAMNet 没加载好时，用音高稳不稳（钢琴稳、人声会滑）先挡一部分。
+  const voiceLike = f => !!f && f.drift != null && (f.drift >= 2 || (f.drift >= 1 && f.sharp < 3) || f.sharp < 2 || f.cbin < 0 || f.cbin > 2);
+  Gate.keysOk = 0.15; // 边说话边弹时，YAMNet 给“钢琴”的分数到这么高就放行
+  function Gate(emit) {
+    const res = [], held = []; let ready = false; const stats = { dropped: 0, held: 0, passed: 0 };
+    function talking(t) { return res.some(r => r.tEnd >= t - 0.6 && r.tEnd <= t + 0.15 && r.voice >= 0.5 && r.keys < 0.5); }
+    function decide(ev, r) {
+      const ok = (r.keys >= Gate.keysOk || r.voice < 0.4) && !voiceLike(ev.feat);
+      if (ok) { stats.passed++; emit(ev); } else stats.dropped++;
+    }
+    return {
+      stats, get ready() { return ready; },
+      offer(ev) {
+        if (!ready) { if (voiceLike(ev.feat)) { stats.dropped++; return; } stats.passed++; return emit(ev); }
+        if (!talking(ev.t)) { stats.passed++; return emit(ev); }
+        stats.held++; held.push(ev);
+      },
+      result(tEnd, voice, keys) {
+        ready = true; res.push({ tEnd, voice, keys }); while (res.length > 12) res.shift();
+        for (let i = 0; i < held.length;) {
+          const ev = held[i];
+          if (tEnd >= ev.t + 0.3) { held.splice(i, 1); decide(ev, { voice, keys }); }
+          else if (tEnd - ev.t > 1.5) { held.splice(i, 1); stats.dropped++; }
+          else i++;
+        }
+      }
+    };
+  }
+
   // 离线跑一段声音（22050 Hz），和网页里实时一样每 cad 秒算一次。用来在手机上自测
-  async function runOffline(p, audio, cad, expectAt, sens) {
-    const core = NNCore({ sens: sens == null ? 0.7 : sens }), evs = [], tf = p.tf;
-    core.on(e => { evs.push(e); });
+  async function runOffline(p, audio, cad, expectAt, sens, o2) {
+    o2 = o2 || {};
+    const core = NNCore(Object.assign({ sens: sens == null ? 0.7 : sens, feat: true }, o2)), evs = [], tf = p.tf;
+    const gate = o2.noGate ? null : Gate(e => evs.push(e)); let lastY = -1e9, yms = 0, yn = 0;
+    core.on(e => { gate ? gate.offer(e) : evs.push(e); });
     const nh = Math.ceil(audio.length / HOP), r = new Float32Array(nh), fl = new Float32Array(nh); let floor = 0.002;
     for (let h = 0; h < nh; h++) { let a = 0; for (let i = h * HOP; i < Math.min(audio.length, h * HOP + HOP); i++) a += audio[i] * audio[i]; r[h] = Math.sqrt(a / HOP);
       floor = r[h] < floor ? floor * 0.7 + r[h] * 0.3 : (r[h] < floor * 1.15 ? floor * 0.995 + r[h] * 0.005 : floor * 0.9995 + r[h] * 0.0005); fl[h] = floor; }
@@ -210,16 +262,22 @@ registerProcessor('pe-tap',Tap);`;
       const e = Math.round(tEnd * SR), win = new Float32Array(N);
       const a0 = Math.max(0, e - N); win.set(audio.subarray(a0, e), N - (e - a0));
       if (expectAt) core.expect(expectAt(tEnd));
-      const t1 = performance.now(), x = tf.tensor3d(win, [1, N, 1]), out = p.model.execute(x, ['Identity_1', 'Identity_2']);
-      const [fr, on] = await Promise.all([out[0].data(), out[1].data()]); x.dispose(); out.forEach(z => z.dispose());
+      const t1 = performance.now(), x = tf.tensor3d(win, [1, N, 1]), out = p.model.execute(x, ['Identity_1', 'Identity_2', 'Identity']);
+      const [fr, on, ct] = await Promise.all([out[0].data(), out[1].data(), out[2].data()]); x.dispose(); out.forEach(z => z.dispose());
       ms += performance.now() - t1; runs++;
       const eh = Math.floor(e / HOP) - 1;
+      if (gate && p.ym && tEnd - lastY >= 0.29 && e >= 22050) {
+        lastY = tEnd; const ty = performance.now();
+        const r = await root.PeVoice.classify(tf, p.ym, audio.subarray(0, e)); yms += performance.now() - ty; yn++;
+        gate.result(tEnd, r.voice, r.keys);
+      }
       core.feed(fr, on, tEnd, t => { const n = Math.round(t * SR / HOP); let mx = 0, pv = 0, pn = 0;
         for (let i = n; i < n + 6 && i <= eh; i++) if (i >= 0) mx = Math.max(mx, r[i]);
         for (let i = n - 6; i < n - 1; i++) if (i >= 0) { pv += r[i]; pn++; }
-        return { rms: mx, prev: pn ? pv / pn : 0, floor: fl[Math.max(0, Math.min(eh, nh - 1))] }; });
+        const hops = []; for (let i = n - 3; i <= n + 5; i++) hops.push(i >= 0 && i <= eh ? +r[i].toFixed(5) : 0);
+        return { rms: mx, prev: pn ? pv / pn : 0, floor: fl[Math.max(0, Math.min(eh, nh - 1))], hops }; }, ct);
     }
-    return { evs, runMs: ms / runs };
+    return { evs, runMs: ms / runs, yamMs: yn ? yms / yn : 0, gate: gate && gate.stats };
   }
   // 合成一个像钢琴的音（几条泛音，快起慢衰）
   function synth(len, notes) {
@@ -234,7 +292,9 @@ registerProcessor('pe-tap',Tap);`;
 
   function NNListener(ctx, src, opt) {
     opt = opt || {};
-    const core = NNCore({ sens: opt.sens, edge: opt.edge });
+    const core = NNCore({ sens: opt.sens, edge: opt.edge, feat: true });
+    const outs = []; const gate = Gate(ev => outs.forEach(fn => fn(ev))); core.on(ev => gate.offer(ev));
+    let ym = null, lastY = 0, yBusy = false;
     const ring = new Float32Array(N); let total = 0, lastRun = 0, running = false, stopTap = null, model = null, tf = null;
     const rmsHop = new Float32Array(512); let floor = 0.002; // 每 256 个采样的音量，环形
     let hopAcc = 0, hopN = 0;
@@ -269,17 +329,28 @@ registerProcessor('pe-tap',Tap);`;
         const tEnd = frameAt, win = new Float32Array(N), s = total % N;
         win.set(ring.subarray(s), 0); win.set(ring.subarray(0, s), N - s);
         const t1 = performance.now();
-        let fr, on;
+        let fr, on, ct;
         try {
           const x = tf.tensor3d(win, [1, N, 1]);
-          const r = model.execute(x, ['Identity_1', 'Identity_2']);
-          [fr, on] = await Promise.all([r[0].data(), r[1].data()]);
+          const r = model.execute(x, ['Identity_1', 'Identity_2', 'Identity']);
+          [fr, on, ct] = await Promise.all([r[0].data(), r[1].data(), r[2].data()]);
           x.dispose(); r.forEach(t => t.dispose());
         } catch (e) { running = false; opt.onFail && opt.onFail('模型运行出错：' + e.message); return; }
         const ms = performance.now() - t1;
         stats.runMs = stats.runs ? stats.runMs * 0.8 + ms * 0.2 : ms; stats.runs++;
         if (stats.runMs > 450 && stats.runs > 5) { stats.slow++; if (stats.slow > 10) { running = false; opt.onFail && opt.onFail('手机算得太慢（每次约 ' + Math.round(stats.runMs) + ' 毫秒）'); return; } } else stats.slow = 0;
-        core.feed(fr, on, tEnd, level);
+        core.feed(fr, on, tEnd, level, ct);
+        // 每 0.3 秒让 YAMNet 看一眼最近 1 秒：是不是有人在说话
+        if (ym && total - lastY >= 0.3 * SR) {
+          lastY = total;
+          try {
+            const ty = performance.now(), seg = new Float32Array(23000), s2 = total % N, yEnd = frameAt;
+            for (let i = 0; i < seg.length; i++) seg[i] = ring[(s2 - seg.length + i + N * 2) % N];
+            const y = await root.PeVoice.classify(tf, ym, seg);
+            stats.yamMs = stats.yamMs ? stats.yamMs * 0.8 + (performance.now() - ty) * 0.2 : performance.now() - ty;
+            gate.result(yEnd, y.voice, y.keys); stats.voice = y.voice; stats.keys = y.keys;
+          } catch (e) { ym = null; stats.yamErr = e.message; }
+        }
         await new Promise(r => setTimeout(r, Math.max(0, 70 - ms)));
       }
     }
@@ -289,15 +360,17 @@ registerProcessor('pe-tap',Tap);`;
       if (stats.runMs > 700) throw new Error('手机算得太慢（每次约 ' + Math.round(stats.runMs) + ' 毫秒）');
       stopTap = await tap(ctx, src, push);
       running = true; loop();
+      // 人声模型晚一点再加载，不耽误先开始听；加载不了就只用音高判断
+      if (root.PeVoice && opt.voiceUrl !== false) tf.loadGraphModel(opt.voiceUrl || 'model/yamnet/model.json').then(m => { ym = m; stats.voiceGate = true; if (opt.onVoice) opt.onVoice(); }, e => { stats.yamErr = e.message; });
     }
     return {
       start, core, stats,
       stop() { running = false; if (stopTap) stopTap(); },
-      expect: ms => core.expect(ms), setSens: v => core.setSens(v), on: fn => core.on(fn),
+      expect: ms => core.expect(ms), setSens: v => core.setSens(v), on: fn => outs.push(fn), gate: gate.stats,
       get running() { return running; }
     };
   }
 
-  const api = { NNCore, NNListener, selfTest, probe, runOffline, synth, SR, HOP, N, NF };
+  const api = { NNCore, NNListener, Gate, voiceLike, selfTest, probe, runOffline, synth, SR, HOP, N, NF };
   if (typeof module !== 'undefined') module.exports = api; else root.PeNN = api;
 })(typeof window !== 'undefined' ? window : globalThis);

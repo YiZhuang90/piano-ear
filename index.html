@@ -23,7 +23,7 @@
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
 *{box-sizing:border-box;min-width:0}
 body{background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans SC",system-ui,sans-serif;overflow-x:clip;margin:0}
-.wrap{max-width:1240px;margin:0 auto;padding-block:20px 40px;padding-left:max(5vw,16px,env(safe-area-inset-left,0px));padding-right:max(5vw,16px,env(safe-area-inset-right,0px))}
+.wrap{margin:0 auto;padding-block:20px 40px;padding-left:max(5vw,16px,env(safe-area-inset-left,0px));padding-right:max(5vw,16px,env(safe-area-inset-right,0px))}
 header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:14px}
 h1{font-size:clamp(30px,5vw,44px);line-height:1.05;letter-spacing:-.02em;font-weight:900;margin:0}
 .chip{font:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:var(--panel);color:var(--mute);font-size:14px;border:1px solid var(--line)}
@@ -31,7 +31,10 @@ h1{font-size:clamp(30px,5vw,44px);line-height:1.05;letter-spacing:-.02em;font-we
 .chip.on .dot{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 25%,transparent)}
 .chip.tap .dot{background:var(--warn)}
 .grid{display:grid;gap:20px}
-@media(min-width:900px){.grid{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);align-items:start}.side{position:sticky;top:16px}}
+@media(min-width:900px){.wrap{padding-left:max(2.5vw,16px,env(safe-area-inset-left,0px));padding-right:max(2.5vw,16px,env(safe-area-inset-right,0px))}
+/* 平板、电脑：琴键和音块一整行铺满宽度，下面左边提示、右边设置 */
+.grid{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);align-items:start}.grid>section{display:contents}
+.stage{grid-column:1/-1}.prompt,#doneBox{grid-column:1}.prompt{margin-top:0}.side{grid-column:2;grid-row:2/span 2;position:sticky;top:16px}}
 .stage{background:linear-gradient(var(--lac2),var(--lac) 40%);border-radius:18px;padding:14px 12px 12px;color:#f1efe9}
 .lane{position:relative;height:clamp(84px,12vh,120px);overflow:hidden;border-radius:10px 10px 0 0;background:repeating-linear-gradient(90deg,transparent 0 calc(100%/var(--nw) - 1px),rgba(255,255,255,.05) calc(100%/var(--nw) - 1px) calc(100%/var(--nw)))}
 .blk{position:absolute;bottom:0;transform:translateX(-50%);display:grid;place-items:center;align-content:center;gap:1px;border-radius:7px;font-weight:700;font-size:11px;line-height:1;transition:bottom .28s ease,opacity .28s ease,left .28s ease;white-space:nowrap}
@@ -164,7 +167,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="wrap">
 <div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 14 版</span></h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 15 版</span></h1>
   <div class="row" style="align-items:center">
     <button class="chip" id="kidsBtn" type="button" title="切到不用识字的儿童页面">🧸 儿童版</button>
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
@@ -234,7 +237,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
       <div class="lvl" title="绿条是现在的音量，黑线是门槛"><i id="lvl"></i><b id="gateMark"></b></div>
       <label class="sens"><span class="row" style="justify-content:space-between"><span class="small">麦克风灵敏度</span><span class="small" id="sensTxt">70</span></span>
         <input type="range" id="sensIn" min="0" max="100" step="5" value="70" aria-label="麦克风灵敏度"></label>
-      <div class="crow"><span class="small">识音方式</span><select id="engSel" aria-label="识音方式"><option value="ai">AI 识别（准，和弦也能听，首次要下载约 1 MB）</option><option value="simple">简单识别（只听单音，省电）</option></select></div>
+      <div class="crow"><span class="small">识音方式</span><select id="engSel" aria-label="识音方式"><option value="ai">AI 识别（准，和弦也能听，说话不算；首次要下载约 3 MB）</option><option value="simple">简单识别（只听单音，省电）</option></select></div>
       <p class="small" style="margin:0">轻轻弹一个音，绿条要越过黑线才算听到。弹了没反应就往右拉；没弹却冒出音来，就往左拉。</p>
     </div>
     <details>
@@ -404,10 +407,11 @@ if (typeof module !== 'undefined') module.exports = { PitchCore };
 </script>
 <script src="score.js?v=8"></script>
 <script src="noteread.js?v=1"></script>
-<script src="nnpitch.js?v=13"></script>
+<script src="nnpitch.js?v=15"></script>
+<script src="voicegate.js?v=15"></script>
 <script>
 {
-const VER = 14;
+const VER = 15;
 // 儿童版（kids.js）听这些事件：lesson / reset / step / hit / miss / finish
 const emit = (t, d) => { try { window.dispatchEvent(new CustomEvent('pe:' + t, { detail: d || {} })); } catch (e) {} };
 const WHITE = [0,2,4,5,7,9,11];
@@ -918,7 +922,7 @@ try { engine = localStorage.getItem('pianoEarEngine') || 'ai'; } catch (e) {}
 function startNN(c, src) {
   if (engine !== 'ai' || !window.PeNN || nn) return;
   micState('on', '正在听（AI 模型加载中…）');
-  const me = PeNN.NNListener(c, src, { sens: sens / 100, onFail: why => nnFail(me, why) });
+  const me = PeNN.NNListener(c, src, { sens: sens / 100, onFail: why => nnFail(me, why), onVoice: () => { if (nn === me) diag('AI 识别已开，人声过滤也开了（' + me.stats.backend + '，每次计算约 ' + Math.round(me.stats.runMs) + ' 毫秒）'); } });
   nn = me;
   me.on(ev => { if (nn !== me || c.currentTime < muteUntil || ev.t < muteUntil) return; onNote(ev.midi, 'mic', ev.t, 'nn'); });
   me.start().then(() => {
@@ -1029,10 +1033,14 @@ if (/[?&]nntest=1/.test(location.search) && window.PeNN) (async () => {
     const p = await PeNN.probe();
     const notes = [{ m: 60, t: 0.8, g: 0.15 }, { m: 48, t: 1.8, g: 0.15 }, { m: 64, t: 1.8, g: 0.15 }, { m: 67, t: 1.8, g: 0.15 }, { m: 69, t: 2.8, g: 0.02 }, { m: 72, t: 3.8, g: 0.006 }];
     const exp = t => t < 1.75 ? [60] : t < 2.75 ? [48, 64, 67] : t < 3.75 ? [69] : [72];
+    let yt = '';
+    try { const t1 = performance.now(); p.ym = await p.tf.loadGraphModel('model/yamnet/model.json'); const lm = Math.round(performance.now() - t1);
+      const y = await PeVoice.classify(p.tf, p.ym, PeNN.synth(2, [{ m: 60, t: 0.5, g: 0.15 }, { m: 64, t: 1.0, g: 0.15 }]));
+      yt = '；人声过滤：加载 ' + lm + ' 毫秒，钢琴像钢琴 ' + y.keys.toFixed(2) + '，像人声 ' + y.voice.toFixed(2); } catch (e) { yt = '；人声过滤没加载上：' + e.message; }
     const r = await PeNN.runOffline(p, PeNN.synth(5, notes), 0.1, exp);
     const got = r.evs.map(e => e.midi), want = notes.map(n => n.m);
     const miss = want.filter(m => !got.includes(m)), extra = got.filter(m => !want.includes(m));
-    say('AI 自测：' + p.stats.backend + '，加载 ' + p.stats.loadMs + ' 毫秒，每次计算 ' + Math.round(r.runMs) + ' 毫秒；6 个音听到 ' + (6 - miss.length) + ' 个' + (extra.length ? '，多听了 ' + extra.length + ' 个' : '') + '（' + r.evs.map(e => nm(e.midi, 'abc')).join(' ') + '）');
+    say('AI 自测：' + p.stats.backend + '，6 个音听到 ' + (6 - miss.length) + ' 个' + (extra.length ? '，多听了 ' + extra.length + ' 个' : '') + '，加载 ' + p.stats.loadMs + ' 毫秒，每次计算 ' + Math.round(r.runMs) + ' 毫秒' + (r.yamMs ? '，人声判断每次 ' + Math.round(r.yamMs) + ' 毫秒' : '') + yt + '（' + r.evs.map(e => nm(e.midi, 'abc')).join(' ') + '）');
   } catch (e) { say('AI 自测失败：' + ((e && e.message) || e)); }
 })();
 setSens(sens);
