@@ -138,6 +138,7 @@ details summary{cursor:pointer;font-weight:700}
 .song.locked{opacity:.5;cursor:not-allowed}
 @media(prefers-reduced-motion:reduce){.blk,.bar i,.tune i{transition:none}}
 </style>
+<link rel="stylesheet" href="kids.css?v=10">
 
 <script>
 window.__errs = [];
@@ -148,8 +149,9 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="wrap">
 <div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 9 版</span></h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 10 版</span></h1>
   <div class="row" style="align-items:center">
+    <button class="chip" id="kidsBtn" type="button" title="切到不用识字的儿童页面">🧸 儿童版</button>
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
     <button class="btn main" id="startBtn" type="button">开始听</button>
   </div>
@@ -382,7 +384,9 @@ if (typeof module !== 'undefined') module.exports = { PitchCore };
 <script src="score.js?v=8"></script>
 <script>
 {
-const VER = 9;
+const VER = 10;
+// 儿童版（kids.js）听这些事件：lesson / reset / step / hit / miss / finish
+const emit = (t, d) => { try { window.dispatchEvent(new CustomEvent('pe:' + t, { detail: d || {} })); } catch (e) {} };
 const WHITE = [0,2,4,5,7,9,11];
 const SOL = ['do','','re','','mi','fa','','sol','','la','','si'];
 const NUM = ['1','','2','','3','4','','5','','6','','7'];
@@ -532,7 +536,7 @@ async function openLesson(id) {
   if (cur !== e) return;
   opt = Object.assign(defaults(e.ls), store.opts[e.ls.id] || {});
   fitWindow(); hand.anchor = null; buildKb();
-  renderCtl(); reset();
+  renderCtl(); reset(); emit('lesson', { id: e.ls.id });
 }
 const saveOpt = () => { store.opts[cur.ls.id] = opt; save(); };
 
@@ -540,7 +544,7 @@ function reset() {
   stopClock(); plan = makePlan();
   idx = 0; okFirst = 0; bad = 0; triedWrong = false; finished = false; t0 = 0; hits = new Set(); beatStats = { on: 0, early: 0, late: 0 };
   $('doneBox').innerHTML = ''; $('fb').textContent = ''; $('fb').className = 'fb'; $('tfb').textContent = ''; $('tfb').className = 'tfb';
-  draw(); showSheet();
+  draw(); showSheet(); emit('reset');
 }
 
 // —— 地图和说明 ——
@@ -650,7 +654,7 @@ function draw() {
   for (let k = idx; k < N && S[k].t <= tMax; k++) S[k].notes.forEach(n => put(n, false, k === idx && !hits.has(n.m)));
   plan.auto.forEach(n => { if (n.hand !== 'A' && n.t >= tNow - 1e-6 && n.t <= tMax) put(n, true, false); });
   if (cur.ls.kind === 'beyer') data.measures.forEach(ms => { if (ms.t > tNow + 1e-6 && ms.t <= tMax && (plan.to == null || ms.n <= plan.to)) { const ln = document.createElement('div'); ln.className = 'mline'; ln.style.bottom = ((ms.t - tNow) * BEAT_PX + 4) + 'px'; ln.innerHTML = `<span>${ms.n}</span>`; lane.appendChild(ln); } });
-  syncCursor();
+  syncCursor(); emit('step', { idx });
 }
 
 // —— 弹对、弹错 ——
@@ -659,6 +663,7 @@ function onNote(m, src, at) {
   $('heard').textContent = nm(m, 'abc') + ' · ' + nm(m, 'sol');
   if (!cur || cur.ls.kind === 'free' || finished || !plan || !plan.steps.length) { flash(m, 'hit'); return; }
   const st = plan.steps[idx], need = st.notes.map(n => n.m);
+  if (src === 'mic' && window.__peGate && window.__peGate(m, need)) return; // 儿童版自己在说话或放音效
   if (src === 'mic' && !need.includes(m) && autoHeard.some(a => ((a.m - m) % 12 === 0) && at >= a.from - 0.06 && at <= a.to)) return; // 是网页自己弹的伴奏
   if (!t0) t0 = performance.now();
   const fb = $('fb');
@@ -666,13 +671,13 @@ function onNote(m, src, at) {
   if (!ok && src === 'mic' && need.length > 1 && need.some(x => (x - m) % 12 === 0)) ok = true; // 和音/八度：麦克风听到其中一个就算
   if (ok) {
     const nt = st.notes.find(n => n.m === m) || st.notes[0];
-    flash(m, 'hit', nt.hand);
+    flash(m, 'hit', nt.hand); emit('hit', { m, src });
     hits.add(m);
     const complete = st.any || src === 'mic' || need.every(x => hits.has(x));
     if (!complete) { fb.className = 'fb good'; fb.textContent = '对，' + need.filter(x => !hits.has(x)).map(x => fullName(x)).join('、') + ' 也要按。'; draw(); return; }
     stepDone(st, at);
   } else {
-    flash(m, 'miss', 'R'); bad++; triedWrong = true;
+    flash(m, 'miss', 'R'); bad++; triedWrong = true; emit('miss', { m, need, src });
     fb.className = 'fb bad';
     if (st.any) fb.textContent = `你弹的是 ${fullName(m)}，找${need.length === 3 ? '三个' : '两个'}黑键那一组。`;
     else { const want = need[0];
@@ -747,7 +752,7 @@ function finish() {
   else if (opt.mode === 'wait' && cur.ls.kind === 'beyer') { next = '音都会了。试试跟拍模式，听着节拍器弹。'; btn = '<button class="btn main" data-act="beat">跟拍子弹</button>' + (nx ? '<button class="btn" data-act="next">下一课</button>' : ''); }
   else if (nx) { next = '可以去下一课了。'; btn = '<button class="btn main" data-act="next">下一课：' + nx.ls.title + '</button>'; }
   $('doneBox').innerHTML = `<div class="done"><b>${starTxt(s)} ${pct}% 一次弹对</b><p style="margin:6px 0 0">${N} 步，用了 ${sec} 秒，弹错 ${bad} 次。${next}</p>${beatLine}<div class="row" style="margin-top:10px">${btn}</div></div>`;
-  renderMap(); draw();
+  renderMap(); draw(); emit('finish', { pct, stars: s, next: nx ? nx.ls.id : null });
   if (opt.loop && pct >= 0 && cur.ls.kind === 'beyer') setTimeout(() => { if (finished) reset(); }, 2500);
 }
 $('doneBox').onclick = e => {
@@ -945,9 +950,12 @@ fetch('lessons/curriculum.json?v=' + VER).then(r => r.json()).then(c => {
   CUR = c; ORDER = []; c.levels.forEach(L => L.lessons.forEach(ls => ORDER.push({ ls, L })));
   openLesson(store.last && ORDER.some(x => x.ls.id === store.last) ? store.last : ORDER[0].ls.id);
 }).catch(e => { $('say').textContent = '课程表没加载出来'; $('hint').textContent = '检查网络后刷新页面。（' + e.message + '）'; });
-window.__pe = { get plan() { return plan; }, get idx() { return idx; }, get cur() { return cur; }, onNote, openLesson, get opt() { return opt; }, get finished() { return finished; } };
+window.__pe = { get plan() { return plan; }, get idx() { return idx; }, get cur() { return cur; }, onNote, openLesson, get opt() { return opt; }, get finished() { return finished; },
+  get ORDER() { return ORDER; }, get CUR() { return CUR; }, get keyEls() { return keyEls; }, get whites() { return whites; }, get data() { return data; }, get hand() { return hand; }, get listening() { return listening; },
+  spb, lessonStars, unlocked: id => { const e = ORDER.find(x => x.ls.id === id); return !!e && unlocked(e); }, nm, tone, getCtx, reset, VER };
 }
 </script>
+<script src="kids.js?v=10"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 <script type="module">
 // 3D 绑骨右手：hand3d/piano-hand.js + right-hand.glb。WebGL 或网络不行就继续用 2D 手。

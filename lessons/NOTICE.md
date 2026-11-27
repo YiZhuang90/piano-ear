@@ -15,3 +15,9 @@
 
 ## 本项目自己写的
 - score.js（读 MusicXML、推指法、分手、配伴奏）、课程表 curriculum.json、关卡说明文字。
+
+## 儿童版（kids.js / kids.css）
+- 语音提示：浏览器自带的朗读功能（Web Speech API 的 speechSynthesis，用手机里的中文语音），不录音、不下载。
+- 图标：系统自带的表情符号（emoji），不带图标文件。
+- 音效（弹对的“叮咚”、弹完的小号声）：网页用 Web Audio 自己合成，没有音频素材。
+- 彩色手指、图画地图、动画：本项目自己写的 CSS 和代码。
