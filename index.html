@@ -237,7 +237,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
       <div class="lvl" title="绿条是现在的音量，黑线是门槛"><i id="lvl"></i><b id="gateMark"></b></div>
       <label class="sens"><span class="row" style="justify-content:space-between"><span class="small">麦克风灵敏度</span><span class="small" id="sensTxt">70</span></span>
         <input type="range" id="sensIn" min="0" max="100" step="5" value="70" aria-label="麦克风灵敏度"></label>
-      <div class="crow"><span class="small">识音方式</span><select id="engSel" aria-label="识音方式"><option value="ai">AI 识别（准，和弦也能听，说话不算；首次要下载约 3 MB）</option><option value="simple">简单识别（只听单音，省电）</option></select></div>
+      <div class="crow"><span class="small">识音方式</span><select id="engSel" aria-label="识音方式"><option value="ai">AI 识别（准，和弦也能听，说话不算；首次要下载约 4.5 MB）</option><option value="simple">简单识别（只听单音，省电）</option></select></div>
       <p class="small" style="margin:0">轻轻弹一个音，绿条要越过黑线才算听到。弹了没反应就往右拉；没弹却冒出音来，就往左拉。</p>
     </div>
     <details>
@@ -250,7 +250,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
       <summary>麦克风诊断</summary>
       <p class="small" id="diag" style="overflow-wrap:anywhere">点“开始听”之后这里会显示检查结果。</p>
     </details>
-    <p class="small">手机放在谱架上，离琴 30 到 50 厘米，琴的音量开到中等。麦克风一次只听一个音：双手同时弹或和音时，听到其中一个就算对。点屏幕上的琴键也算弹（要全部点到），没有麦克风时可以这样先熟悉。</p>
+    <p class="small">手机放在谱架上，离琴 30 到 50 厘米，琴的音量开到中等。用 AI 识别时和音要每个音都弹到；用普通识别时麦克风一次只听一个音，和音听到其中一个就算对。点屏幕上的琴键也算弹（要全部点到），没有麦克风时可以这样先熟悉。</p>
   </div>
 </aside>
 </div>
