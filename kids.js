@@ -30,6 +30,8 @@
     let fired = false;
     const fin = () => { if (fired) return; fired = true; if (my === tok) { speakingUntil = performance.now() + 250; if (done) done(); } };
     if (!kids || !voiceOn || !synth || !window.SpeechSynthesisUtterance) { setTimeout(fin, 250); return; }
+    // 正在请求麦克风时先不说话（iPhone 上说话会打断麦克风请求），等请求有结果再说
+    if (P() && P().micAsking) { const w0 = performance.now(); const wait = () => { if (my !== tok) return; if (P().micAsking && performance.now() - w0 < 10000) setTimeout(wait, 200); else { tok--; say(text, done); } }; setTimeout(wait, 200); return; }
     try { synth.cancel(); } catch (e) {}
     const est = 700 + text.length * 280;
     speakingUntil = performance.now() + est;

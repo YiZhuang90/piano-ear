@@ -149,7 +149,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="wrap">
 <div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 10 版</span></h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 11 版</span></h1>
   <div class="row" style="align-items:center">
     <button class="chip" id="kidsBtn" type="button" title="切到不用识字的儿童页面">🧸 儿童版</button>
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
@@ -384,7 +384,7 @@ if (typeof module !== 'undefined') module.exports = { PitchCore };
 <script src="score.js?v=8"></script>
 <script>
 {
-const VER = 10;
+const VER = 11;
 // 儿童版（kids.js）听这些事件：lesson / reset / step / hit / miss / finish
 const emit = (t, d) => { try { window.dispatchEvent(new CustomEvent('pe:' + t, { detail: d || {} })); } catch (e) {} };
 const WHITE = [0,2,4,5,7,9,11];
@@ -838,11 +838,16 @@ function micState(cls, txt) { const c = $('micChip'); c.className = 'chip ' + cl
 let asking = false;
 const IN_APP = /MicroMessenger|WeChat|FBAN|FBAV|Instagram|Line\/|Claude/i.test(navigator.userAgent);
 const NO_API = '这个浏览器不让网页用麦克风。' + (IN_APP ? '你可能是在某个 App 里打开的，请点右上角菜单，选“在 Safari 中打开”。' : '请用 Safari 或 Chrome 直接打开这个网址。');
+let askedAt = 0;
 function startMic() {
-  if (listening || asking) return;
+  if (listening) return;
+  // 上一次请求卡住了（没弹出允许框、也没回音）：8 秒后再点就重新请求，不再默默不理
+  if (asking && performance.now() - askedAt < 8000) return;
   diag('已点开始听');
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return micFail(NO_API);
-  asking = true; micState('', '正在请求麦克风…');
+  // iPhone 上网页正在“说话”时请求麦克风会被打断（儿童版有语音），先停掉
+  try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+  asking = true; askedAt = performance.now(); micState('', '正在请求麦克风…');
   let c; try { c = getCtx(); } catch (e) { diag('AudioContext 失败 ' + e.name + ' ' + e.message); asking = false; return micFail('这个浏览器的声音功能打不开。'); }
   // 和 getUserMedia 在同一次点按里，iOS 才放行声音
   const slow = setTimeout(() => { if (asking) showNote('屏幕上如果弹出“允许使用麦克风”，请点“允许”。'); }, 5000);
@@ -871,7 +876,7 @@ function startMic() {
       else if (n === 'NotFoundError' || n === 'DevicesNotFoundError') micFail('没找到麦克风。');
       else if (n === 'NotReadableError' || n === 'TrackStartError') micFail('麦克风正被别的 App 用着（比如通话、录音），关掉后再点“开始听”。');
       else if (n === 'SecurityError') micFail(NO_API);
-      else micFail('麦克风打不开（' + (n || '未知原因') + '）。');
+      else micFail('麦克风打不开（' + (n || '未知原因') + (e && e.message ? '：' + e.message : '') + '）。');
     });
 }
 function diag(t) {
@@ -951,11 +956,11 @@ fetch('lessons/curriculum.json?v=' + VER).then(r => r.json()).then(c => {
   openLesson(store.last && ORDER.some(x => x.ls.id === store.last) ? store.last : ORDER[0].ls.id);
 }).catch(e => { $('say').textContent = '课程表没加载出来'; $('hint').textContent = '检查网络后刷新页面。（' + e.message + '）'; });
 window.__pe = { get plan() { return plan; }, get idx() { return idx; }, get cur() { return cur; }, onNote, openLesson, get opt() { return opt; }, get finished() { return finished; },
-  get ORDER() { return ORDER; }, get CUR() { return CUR; }, get keyEls() { return keyEls; }, get whites() { return whites; }, get data() { return data; }, get hand() { return hand; }, get listening() { return listening; },
+  get ORDER() { return ORDER; }, get CUR() { return CUR; }, get keyEls() { return keyEls; }, get whites() { return whites; }, get data() { return data; }, get hand() { return hand; }, get listening() { return listening; }, get micAsking() { return asking; },
   spb, lessonStars, unlocked: id => { const e = ORDER.find(x => x.ls.id === id); return !!e && unlocked(e); }, nm, tone, getCtx, reset, VER };
 }
 </script>
-<script src="kids.js?v=10b"></script>
+<script src="kids.js?v=11"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 <script type="module">
 // 3D 绑骨右手：hand3d/piano-hand.js + right-hand.glb。WebGL 或网络不行就继续用 2D 手。
