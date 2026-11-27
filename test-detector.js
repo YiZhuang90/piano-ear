@@ -31,7 +31,7 @@ function synth(notes, total, o) {
     const ds = [0.031, 0.047, 0.061].map(x => Math.floor(x * SR));
     for (let i = 0; i < out.length; i++) for (const dd of ds) if (i >= dd) out[i] += out[i - dd] * 0.25;
   }
-  for (let i = 0; i < out.length; i++) out[i] += (rnd() - 0.5) * (o.noise || 0.002);
+  for (let i = 0; i < out.length; i++) out[i] += (rnd() - 0.5) * (o.noise || 0.002) + (o.hum ? o.hum * Math.sin(2 * Math.PI * 50 * i / SR) : 0);
   return out;
 }
 
@@ -49,13 +49,13 @@ function run(name, o) {
   const seq = SONGS[o.song]; const beat = o.beat || 0.5;
   let t = 0.4; const notes = [];
   for (const m of seq) {
-    const vel = o.soft ? 0.12 : o.velVar ? 0.35 + 0.65 * rnd() : 0.8;
+    const vel = o.vel || (o.soft ? 0.12 : o.velVar ? 0.35 + 0.65 * rnd() : 0.8);
     const jitter = o.jitter ? (rnd() - 0.5) * 0.06 : 0;
     notes.push({ midi: m, t: t + jitter, dur: beat * (o.legato ? 1.05 : 0.85), vel });
     t += beat * (o.pause && rnd() < 0.3 ? 2 : 1);
   }
   const audio = synth(notes, t + 1, o);
-  const det = PitchCore(SR, { refA4: o.refA4 || 440 });
+  const det = PitchCore(SR, { refA4: o.refA4 || 440, sens: o.sens });
   const got = []; det.on(e => got.push(e));
   const N = 2048, H = o.hop || 800;
   for (let i = 0; i + N <= audio.length; i += H) det.process(audio.subarray(i, i + N), (i + N) / SR);
@@ -90,6 +90,18 @@ const cases = [
   ['宽音域 C3–C6', { song: 'wide' }],
   ['同音快速连击 0.25s', { song: 'repeat', beat: 0.25 }],
   ['同音连击+混响+力度不均', { song: 'repeat', beat: 0.3, reverb: true, velVar: true }],
+  // 轻声（第 9 版新增）。旧版力度 0.06 以下就听不到；默认灵敏度下 0.015 也要全对
+  ['轻弹 力度 0.03', { song: 'ode', vel: 0.03 }],
+  ['很轻 力度 0.015', { song: 'twinkle', vel: 0.015 }],
+  ['很轻+混响 力度 0.015', { song: 'tigers', vel: 0.015, reverb: true }],
+  ['很轻 音阶 力度 0.015', { song: 'scale', vel: 0.015 }],
+  ['极轻 力度 0.012（灵敏度最高）', { song: 'scale', vel: 0.012, sens: 1 }],
+  ['中等偏轻+屋里吵 (噪声 0.006)', { song: 'ode', vel: 0.06, noise: 0.006 }],
+  ['轻弹+50Hz 电源嗡声', { song: 'twinkle', vel: 0.02, hum: 0.01 }],
+  ['轻弹 连奏', { song: 'twinkle', vel: 0.02, legato: true }],
+  ['轻弹 同音连击', { song: 'repeat', vel: 0.02, beat: 0.3 }],
+  ['大声弹 + 最高灵敏度', { song: 'tigers', vel: 0.8, sens: 1, reverb: true }],
+  ['最低灵敏度（旧版）正常力度', { song: 'ode', sens: 0 }],
 ];
 // 误报测试：拍手/噪声爆发，不应出音
 {
@@ -102,4 +114,15 @@ const cases = [
 }
 let pass = 0;
 for (const [n, o] of cases) if (run(n, o)) pass++;
+// 误报：不同灵敏度下的拍手、敲桌、持续噪声和嗡声
+for (const sens of [0.7, 1]) {
+  const a = new Float32Array(SR * 6);
+  for (let i = 0; i < a.length; i++) a[i] = (rnd() - 0.5) * 0.004 + 0.004 * Math.sin(2 * Math.PI * 50 * i / SR);
+  for (const c of [0.5, 1.2, 2.0]) for (let i = 0; i < 0.04 * SR; i++) a[Math.floor(c * SR) + i] += (rnd() - 0.5) * 0.8 * Math.exp(-i / (0.01 * SR));
+  for (const c of [2.8, 3.4]) for (let i = 0; i < 0.03 * SR; i++) a[Math.floor(c * SR) + i] += (rnd() - 0.5) * 0.05 * Math.exp(-i / (0.004 * SR)); // 轻敲桌
+  for (let i = Math.floor(4 * SR); i < 5.5 * SR; i++) a[i] += (rnd() - 0.5) * 0.03; // 一段风扇/翻书沙沙声
+  const det = PitchCore(SR, { sens }); let n = 0; det.on(() => n++);
+  for (let i = 0; i + 2048 <= a.length; i += 800) det.process(a.subarray(i, i + 2048), (i + 2048) / SR);
+  console.log((n === 0 ? 'PASS' : 'FAIL') + (' 拍手+敲桌+沙沙声+嗡声 灵敏度 ' + sens).padEnd(36) + ' 误报 ' + n);
+}
 console.log(`\n${pass}/${cases.length} 通过`);
