@@ -12,6 +12,12 @@
 
 ## 五线谱显示
 - OpenSheetMusicDisplay 2.3.1（BSD-3-Clause），网页运行时从 jsDelivr 加载。
+- 认谱入门（第 0.5 关）的五线谱用 VexFlow 4.2.3（MIT 许可，作者 Mohit Muthanna Cheppudira 等，https://github.com/0xfe/vexflow ），网页运行时从 jsDelivr 加载；加载不了时用 noteread.js 自己画的简单五线谱。
+
+## 认谱入门（noteread.js）
+- 复习方法是公开的“莱特纳记忆盒子”（Leitner system）：每个音一个盒子号，弹对升一格，弹错回到 0。代码是本项目自己写的。
+- 看过的开源认谱练习：TeemuKoivisto/midi-note-trainer（MIT，同样用 VexFlow），只借鉴了“用 VexFlow 画单个音”的做法，没有复制代码；其他找到的认谱程序是 GPL 或没有写许可，没有用。
+- 认谱课的小曲（热十字包、欢乐颂、小星星、玛丽有只小羊羔、小船轻划、《普世欢腾》开头一句）都是公有领域旋律，简谱是本项目自己记的；《普世欢腾》一句的节奏简化过。
 
 ## 本项目自己写的
 - score.js（读 MusicXML、推指法、分手、配伴奏）、课程表 curriculum.json、关卡说明文字。

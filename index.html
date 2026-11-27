@@ -119,6 +119,13 @@ details summary{cursor:pointer;font-weight:700}
 .desk{background:#fbfaf6;border-radius:10px;margin-bottom:8px;color:#141518;position:relative}
 .desk #sheet{position:relative;overflow-x:auto;overflow-y:hidden;min-height:96px;-webkit-overflow-scrolling:touch}
 .desk.faint #sheet{opacity:.32}
+.flash{background:#fbfaf6;border-radius:10px;margin-bottom:8px;color:#141518;padding:4px 6px 2px}
+.flash .fsheet{overflow-x:auto;overflow-y:hidden;min-height:110px;-webkit-overflow-scrolling:touch}
+.flash .fsheet svg{display:block}
+.flash .fmsg{font-size:13px;color:#5b5a55;padding:2px 4px 4px;min-height:18px}
+.flash .fmsg b{color:#c8102e}
+.stage.read .lane{height:clamp(30px,5vh,48px)}
+.stage.read .lane .blk{display:none}
 .desk #sheetMsg{position:absolute;left:10px;top:8px;font-size:13px;color:#5b5e66}
 .desk #sheetMsg:empty{display:none}
 .tfb{min-height:22px;font-size:15px;font-weight:700}
@@ -157,7 +164,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="wrap">
 <div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 13 版</span></h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 14 版</span></h1>
   <div class="row" style="align-items:center">
     <button class="chip" id="kidsBtn" type="button" title="切到不用识字的儿童页面">🧸 儿童版</button>
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
@@ -169,7 +176,8 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="grid">
 <section>
   <div class="stage" id="stage" style="--nw:12">
-    <div class="desk" id="desk" hidden><div id="sheet"></div><div id="sheetMsg"></div></div>
+    <div class="flash" id="flash" hidden><div class="fsheet" id="fsheet"></div><div class="fmsg" id="fmsg"></div></div>
+  <div class="desk" id="desk" hidden><div id="sheet"></div><div id="sheetMsg"></div></div>
     <div class="kwrap" id="kwrap"><div class="lyric" id="lyric"></div><div class="kfade l" id="kfadeL">‹</div><div class="kfade r" id="kfadeR">›</div>
       <div class="kscroll" id="kscroll"><div class="kinner" id="kinner">
         <div class="lane" id="lane"></div>
@@ -395,10 +403,11 @@ if (typeof module !== 'undefined') module.exports = { PitchCore };
 
 </script>
 <script src="score.js?v=8"></script>
+<script src="noteread.js?v=1"></script>
 <script src="nnpitch.js?v=13"></script>
 <script>
 {
-const VER = 13;
+const VER = 14;
 // 儿童版（kids.js）听这些事件：lesson / reset / step / hit / miss / finish
 const emit = (t, d) => { try { window.dispatchEvent(new CustomEvent('pe:' + t, { detail: d || {} })); } catch (e) {} };
 const WHITE = [0,2,4,5,7,9,11];
@@ -494,12 +503,15 @@ async function prepare(ls) {
     ['R', 'L'].forEach(h => Score.assignFingers(ev.filter(e => e.hand === h), h));
     d = { xml, events: ev, measures: sc.measures, tempo: sc.tempo || 100, words: sc.words };
     if (ls.accomp) d.accomp = Score.simpleAccomp(ev, sc.measures);
-  } else if (ls.kind === 'song') {
-    let t = 0; const ev = parseJianpu(ls.jianpu).map((n, i) => { const e = { m: n.m, t, d: n.b, measure: Math.floor(t / 4) + 1, hand: ls.hands, tip: ls.tips && ls.tips[i], lyric: ls.lyric && ls.lyric[i] }; t += n.b; return e; });
-    if (ls.fing) ls.fing.split(' ').forEach((f, i) => { if (ev[i]) ev[i].f = +f; });
+  } else if (ls.kind === 'song' || ls.kind === 'read') {
+    let src = ls;
+    if (ls.review) { src = NoteRead.pickReview(ORDER.filter(x => x.ls.kind === 'read' && x.ls.jianpu && x.L === (ORDER.find(o => o.ls === ls) || {}).L).map(x => x.ls), readBox, parseJianpu) || ORDER.find(x => x.ls.kind === 'read' && x.ls.jianpu).ls; }
+    let t = 0; const ev = parseJianpu(src.jianpu).map((n, i) => { const e = { m: n.m, t, d: n.b, measure: Math.floor(t / 4) + 1, hand: ls.hands, tip: src.tips && src.tips[i], lyric: src.lyric && src.lyric[i] }; if (ls.kind === 'read') e.clef = src.clef || 'treble'; t += n.b; return e; });
+    if (src.fing) src.fing.split(' ').forEach((f, i) => { if (ev[i]) ev[i].f = +f; });
     Score.assignFingers(ev, ls.hands);
     const measures = []; for (let k = 0; k * 4 < t; k++) measures.push({ n: k + 1, t: k * 4, len: 4, beats: 4, beatType: 4 });
-    d = { events: ev, measures, tempo: 100 };
+    d = { events: ev, measures, tempo: 100, from: src !== ls ? src : null };
+    if (ls.review) return d; // 复习每次重新挑
   } else if (ls.kind === 'find') {
     const ev = []; ls.groups.forEach((g, i) => g.forEach(m => ev.push({ m, t: i * 2, d: 2, measure: i + 1, hand: 'R', any: true })));
     d = { events: ev, measures: ls.groups.map((g, i) => ({ n: i + 1, t: i * 2, len: 2, beats: 2, beatType: 4 })), tempo: 80, find: true };
@@ -510,9 +522,10 @@ async function prepare(ls) {
 // —— 练习设置（每课记住） ——
 let data = null, plan = null, opt = null;
 let idx = 0, okFirst = 0, bad = 0, triedWrong = false, finished = false, t0 = 0, hits = new Set();
+let readBox = NoteRead.load(), readGhost = null, readHide = false; // 认谱课：记忆盒子、刚弹错的音、答案藏不藏
 let nn = null, nnOn = false; // AI 识别（见下面“麦克风”）
 let beatStats = { on: 0, early: 0, late: 0 }, clock = null; // 跟拍模式
-const defaults = ls => ({ hands: ls.hands === 'RL' ? 'R' : (ls.hands || 'R'), mode: 'wait', tempo: ls.kind === 'beyer' ? 60 : 100, staff: (cur && cur.L.staff) || 'off', accomp: !!ls.accomp, from: null, to: null, loop: false });
+const defaults = ls => ({ hands: ls.hands === 'RL' ? 'R' : (ls.hands || 'R'), mode: ls.mode || 'wait', tempo: ls.kind === 'beyer' ? 60 : 100, staff: (cur && cur.L.staff) || 'off', accomp: !!ls.accomp, from: null, to: null, loop: false });
 
 function makePlan() {
   const ls = cur.ls, range = { from: opt.from || ls.from || null, to: opt.to || ls.to || null };
@@ -576,7 +589,7 @@ const saveOpt = () => { store.opts[cur.ls.id] = opt; save(); };
 function reset() {
   stopClock(); plan = makePlan();
   scrollKey = scrollKey ? 'reset' : '';
-  idx = 0; okFirst = 0; bad = 0; triedWrong = false; finished = false; t0 = 0; hits = new Set(); beatStats = { on: 0, early: 0, late: 0 };
+  idx = 0; okFirst = 0; bad = 0; triedWrong = false; readGhost = null; finished = false; t0 = 0; hits = new Set(); beatStats = { on: 0, early: 0, late: 0 };
   $('doneBox').innerHTML = ''; $('fb').textContent = ''; $('fb').className = 'fb'; $('tfb').textContent = ''; $('tfb').className = 'tfb';
   draw(); showSheet(); emit('reset');
 }
@@ -585,7 +598,7 @@ function reset() {
 function unlocked(e) {
   if (store.unlockAll || e.L.always) return true;
   const i = ORDER.indexOf(e); if (i <= 0) return true;
-  const prev = ORDER.slice(0, i).reverse().find(x => !x.L.always);
+  const prev = ORDER.slice(0, i).reverse().find(x => !x.L.always && (e.L.optional || !x.L.optional));
   return !prev || lessonStars(prev.ls) >= 1 || !!store.best[e.ls.id];
 }
 function renderMap() {
@@ -646,11 +659,14 @@ function draw() {
     $('lyric').textContent = ''; $('prog').style.width = '0'; drawHand(null);
     if (scrollKey !== 'free') { showRange(keyPx(60) - KW / 2, keyPx(72) + KW / 2, false); scrollKey = 'free'; } return;
   }
-  const S = plan.steps, N = S.length;
+  const S = plan.steps, N = S.length, rd = cur.ls.kind === 'read';
   $('prog').style.width = (N ? idx / N * 100 : 0) + '%';
+  $('stage').classList.toggle('read', rd); $('flash').hidden = !rd;
+  readHide = rd && !finished && !!S[idx] && !NoteRead.shown(cur.ls, readBox, S[idx].notes[0], triedWrong);
+  if (rd && N) NoteRead.render($('fsheet'), S.map(s => s.notes[0]), finished ? N : idx, readGhost);
   if (finished || !N) { drawHand(null); $('lyric').textContent = ''; return; }
   const st = S[idx];
-  st.notes.forEach(n => { const el = keyEls[n.m]; if (el) el.classList.add(n.hand === 'L' ? 'target2' : 'target'); });
+  if (!readHide) st.notes.forEach(n => { const el = keyEls[n.m]; if (el) el.classList.add(n.hand === 'L' ? 'target2' : 'target'); });
   // 提示文字
   const R = st.notes.filter(n => n.hand === 'R'), Lh = st.notes.filter(n => n.hand === 'L');
   const part = (arr, who) => arr.length ? (who ? who + '弹 ' : '弹 ') + arr.map(n => `<em class="${n.hand === 'L' ? 'lh' : ''}">${fullName(n.m)}</em>` + (n.f ? `（${n.f} 指）` : '')).join(' + ') : '';
@@ -672,10 +688,18 @@ function draw() {
     else tip = R.length ? '轮到右手。' : '轮到左手。';
     if (prev && st.measure !== prev.measure && data.measures.length && opt.mode === 'beat') tip += ' 新的一小节。';
   }
+  if (rd) { // 认谱课：用谱上的位置说话
+    const n = st.notes[0], pos = NoteRead.where(n.m, n.clef), prev = idx > 0 ? S[idx - 1].notes[0] : null;
+    const rel = prev ? NoteRead.stepsBetween(prev.m, n.m, n.clef) : null;
+    const relTxt = rel === null ? '' : rel === 0 ? '和上一个音在同一个位置。' : `比上一个音${rel > 0 ? '高' : '低'} ${Math.abs(rel)} 格${Math.abs(rel) === 1 ? '（线到旁边的间，或间到旁边的线）' : ''}。`;
+    $('say').innerHTML = readHide ? '看谱，在琴上弹<em>红色</em>的那个音' : `弹 <em>${fullName(n.m)}</em>` + (n.f ? `（${n.f} 指）` : '');
+    tip = (!readHide && n.tip) || (readHide ? relTxt + '想想它是哪个音，再弹。弹错了琴键会亮出来。' : `${nm(n.m, 'sol')} 在谱上${pos}。` + relTxt);
+    $('fmsg').innerHTML = readGhost ? `蓝色是你刚弹的 ${nm(readGhost.m, 'sol')}，在${NoteRead.where(readGhost.m, n.clef)}。` : '红色：现在要弹　绿色：弹过了　弹错时蓝色画出你弹的音';
+  }
   $('hint').textContent = tip;
   $('hint').className = 'hint' + (st.shiftR || st.shiftL ? ' shift' : '');
   if (plan.hands === 'L' && !R.length) drawHand(null);
-  else if (st.anchorR !== null && st.anchorR >= 0 && st.anchorR <= NW - 5) drawHand(st.anchorR, R.length ? R[0].f : null); else drawHand(null);
+  else if (st.anchorR !== null && st.anchorR >= 0 && st.anchorR <= NW - 5) drawHand(st.anchorR, R.length && !readHide ? R[0].f : null); else drawHand(null);
   const sk = cur.ls.id + ':' + idx; if (sk !== scrollKey) { scrollToStep(st); scrollKey = sk; }
   $('lyric').textContent = st.notes[0].lyric ? plan.steps.slice(Math.max(0, idx - 3), idx).map(s => s.notes[0].lyric || '').join('') + '【' + st.notes[0].lyric + '】' + plan.steps.slice(idx + 1, idx + 5).map(s => s.notes[0].lyric || '').join('') : '';
   // 音块：高度 = 时值；另一只手淡淡地画出来
@@ -723,13 +747,20 @@ function onNote(m, src, at, how) {
     else { const want = need[0];
       if ((m - want) % 12 === 0) fb.textContent = `音名对了，但${m > want ? '高' : '低'}了 ${Math.abs(m - want) / 12} 个八度。往${m > want ? '左' : '右'}找同样的键。`;
       else { const d = whiteDist(m, want); fb.textContent = `你弹的是 ${fullName(m)}，要往${d > 0 ? '右' : '左'} ${Math.abs(d)} 个白键${isW(want) ? '' : '，是个黑键'}。`; } }
+    if (cur.ls.kind === 'read' && !st.any) {
+      const want = need[0], cl = st.notes[0].clef, k = NoteRead.stepsBetween(m, want, cl);
+      readGhost = { m, label: nm(m, 'sol') };
+      fb.textContent = `你弹的是 ${fullName(m)}，在谱上是${NoteRead.where(m, cl)}（蓝色）。红色的音` + (k === 0 ? '位置一样，是升降号不同。' : `比它${k > 0 ? '高' : '低'} ${Math.abs(k)} 格，琴键已经亮出来了。`);
+      draw();
+    }
     $('sBad').textContent = bad;
   }
 }
 function stepDone(st, at) {
   const c = getCtx(), now = at || c.currentTime, fb = $('fb');
   if (!triedWrong) okFirst++;
-  triedWrong = false; hits = new Set(); prevNeed = st.notes.map(n => n.m); prevAt = now;
+  if (cur.ls.kind === 'read') { st.notes.forEach(n => NoteRead.record(readBox, n, !triedWrong)); NoteRead.save(readBox); }
+  readGhost = null; triedWrong = false; hits = new Set(); prevNeed = st.notes.map(n => n.m); prevAt = now;
   if (opt.mode === 'beat') judgeBeat(st, now);
   playAuto(st.t, idx + 1 < plan.steps.length ? plan.steps[idx + 1].t : plan.lastT, now);
   idx++;
@@ -1050,11 +1081,11 @@ fetch('lessons/curriculum.json?v=' + VER).then(r => r.json()).then(c => {
   openLesson(store.last && ORDER.some(x => x.ls.id === store.last) ? store.last : ORDER[0].ls.id);
 }).catch(e => { $('say').textContent = '课程表没加载出来'; $('hint').textContent = '检查网络后刷新页面。（' + e.message + '）'; });
 window.__pe = { get plan() { return plan; }, get idx() { return idx; }, get cur() { return cur; }, onNote, openLesson, get opt() { return opt; }, get finished() { return finished; },
-  get ORDER() { return ORDER; }, get CUR() { return CUR; }, get keyEls() { return keyEls; }, get whites() { return whites; }, get data() { return data; }, get hand() { return hand; }, get listening() { return listening; }, get micAsking() { return asking; },
+  get ORDER() { return ORDER; }, get CUR() { return CUR; }, get keyEls() { return keyEls; }, get whites() { return whites; }, get data() { return data; }, get hand() { return hand; }, get listening() { return listening; }, get micAsking() { return asking; }, get hideAns() { return readHide; },
   spb, lessonStars, unlocked: id => { const e = ORDER.find(x => x.ls.id === id); return !!e && unlocked(e); }, nm, tone, getCtx, reset, VER };
 }
 </script>
-<script src="kids.js?v=11"></script>
+<script src="kids.js?v=12"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 <script type="module">
 // 3D 绑骨右手：hand3d/piano-hand.js + right-hand.glb。WebGL 或网络不行就继续用 2D 手。

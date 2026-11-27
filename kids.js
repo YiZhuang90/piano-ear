@@ -12,9 +12,9 @@
   const SYL = { 0: '哆', 2: '来', 4: '咪', 5: '发', 7: '嗦', 9: '啦', 11: '西' };
   const syl = m => { const p = ((m % 12) + 12) % 12, s = SYL[p] || ('升' + SYL[p - 1]); return (m >= 72 ? '高音' : m < 60 ? '低音' : '') + s; };
   // 地图上的图：每关一个，儿歌和入门每首一个
-  const LV_E = { L0: '🎹', Lx: '🎵', L1: '🐣', L2: '🐥', L3: '👐', L4: '🥁', L5: '🔄', L6: '🎓' };
-  const LS_E = { k2: '⚫⚫', k3: '⚫⚫⚫', c: '🏠', warm: '🖐️', warmH: '🦒', warmL: '🤚', hc: '🥯', ml: '🐑', od: '🎉', jb: '🔔', tw: '⭐', tg: '🐯', free: '🎈' };
-  const MAP_ORDER = ['L0', 'Lx', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
+  const LV_E = { L0: '🎹', Lr: '🎼', Lx: '🎵', L1: '🐣', L2: '🐥', L3: '👐', L4: '🥁', L5: '🔄', L6: '🎓' };
+  const LS_E = { k2: '⚫⚫', k3: '⚫⚫⚫', c: '🏠', warm: '🖐️', warmH: '🦒', warmL: '🤚', hc: '🥯', ml: '🐑', od: '🎉', jb: '🔔', tw: '⭐', tg: '🐯', free: '🎈', r1: '🥯', r2: '🎉', r3: '⭐', r4: '🪜', r5: '🐑', r6: '⛵', r7: '🔁', r8: '🐻' };
+  const MAP_ORDER = ['L0', 'Lr', 'Lx', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
 
   let kids = false, voiceOn = true, holdCue = false, resetN = 0, lastKey = '', lastMissSay = 0, micAsked = false;
   let speakingUntil = 0, fxUntil = 0, tok = 0;
@@ -154,6 +154,7 @@
     const ls = pe.cur.ls;
     if (ls.kind === 'free') { holdCue = false; say('随便弹弹，听听好听的声音'); return; }
     if (ls.kind === 'find') { holdCue = false; cue(true); return; }
+    if (ls.kind === 'read') { holdCue = false; say('看上面的五线谱，红色的小音符在哪里，就在琴上弹哪个键。', () => cue(true)); return; }
     say('我们来弹' + title(ls) + '。先听我弹一遍。', () => runDemo(() => { say('轮到你了。', () => cue(true)); }));
   }
   function runDemo(done) {
@@ -186,6 +187,7 @@
     const pe = P(), st = stepNow();
     clearColors();
     if (!st) { showFinger(null); return; }
+    if (pe.hideAns) { showFinger(null); return; } // 认谱课：答案藏起来，不涂颜色
     st.notes.forEach(n => { const k = pe.keyEls[n.m]; if (k) k.style.setProperty('--kc', FC[n.f] || (n.hand === 'L' ? '#2f6fdb' : '#c8102e')); });
     const r = st.notes.find(n => n.hand === 'R') || st.notes[0];
     const ov = $('handov'); if (ov && r.f) ov.style.setProperty('--kc', FC[r.f]);
@@ -206,6 +208,7 @@
     const pe = P(), st = stepNow(); if (!st) return '';
     const prev = pe.idx > 0 ? pe.plan.steps[pe.idx - 1] : null;
     if (st.any) return full ? '找一找，弹亮起来的黑键，哪个都可以' : '再找一组黑键';
+    if (pe.cur.ls.kind === 'read' && pe.hideAns) return full ? '看看红色的小音符在哪里，在琴上找到它' : '看谱，找红色的音';
     const who = n => (pe.plan.hands === 'RL' || n.hand === 'L') ? (n.hand === 'L' ? '左手' : '右手') : '';
     const one = (n, long) => n.f ? (long ? `${who(n)}用${CN[n.f]}的${FN[n.f]}，弹${syl(n.m)}` : `${who(n)}${CN[n.f]}${FN[n.f]}，${syl(n.m)}`) : `弹${syl(n.m)}`;
     let t;
