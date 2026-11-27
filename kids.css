@@ -7,6 +7,7 @@ body.kids .side,body.kids #say,body.kids #hint,body.kids #fb,body.kids #tfb,body
 body.kids .grid{grid-template-columns:1fr}
 body.kids h1{font-size:22px}
 body.kids h1 .small{display:none}
+body.kids #desk{display:none!important}
 
 /* 顶部大图标 */
 .kbar{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:0 0 12px}
@@ -57,7 +58,7 @@ body.kids .fgr.kpr{background:color-mix(in srgb,var(--kc) 80%,transparent)}
 @keyframes kfade{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
 
 /* 全屏层：开始、地图、弹完 */
-.kover{position:fixed;inset:0;z-index:30;background:color-mix(in srgb,var(--bg) 94%,transparent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:60px 16px 30px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.kover{position:fixed;inset:0;z-index:30;background:color-mix(in srgb,var(--bg) 97%,transparent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:60px 16px 30px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .kover[hidden]{display:none}
 .kpic{font-size:88px;line-height:1}
 .kplay{width:120px;height:120px;border-radius:50%;border:0;background:var(--felt);color:#fff;font-size:56px;cursor:pointer;display:grid;place-items:center;box-shadow:0 6px 0 #8d0c22;touch-action:manipulation}
@@ -72,7 +73,8 @@ body.kids .fgr.kpr{background:color-mix(in srgb,var(--kc) 80%,transparent)}
 .kisle h3{margin:6px 0 8px;font-size:30px;line-height:1;text-align:left}
 .ktiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px}
 .ktile{font:inherit;position:relative;border:2px solid var(--line);background:var(--panel);border-radius:18px;height:104px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:4px;color:var(--ink);touch-action:manipulation}
-.ktile .e{font-size:40px;line-height:1.05}
+.ktile .e{font-size:40px;line-height:1.05;white-space:nowrap}
+.ktile .e.sm{font-size:24px;letter-spacing:-1px}
 .ktile .s{font-size:16px;letter-spacing:1px;color:#d4a017}
 .ktile .n{position:absolute;top:6px;left:8px;font-size:11px;color:var(--mute);letter-spacing:1px}
 .ktile.cur{border-color:var(--felt);box-shadow:0 0 0 3px color-mix(in srgb,var(--felt) 35%,transparent)}
@@ -82,3 +84,4 @@ body.kids .fgr.kpr{background:color-mix(in srgb,var(--kc) 80%,transparent)}
 .ktile.shake{animation:kshake .4s}
 @keyframes kshake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 @media(prefers-reduced-motion:reduce){body.kids .wk.target,.kdots b.on,.kstars span,.kstar{animation:none}}
+body.kids .wk.target .mc{color:#fff}

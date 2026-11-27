@@ -274,7 +274,7 @@
         L.lessons.map((ls, i) => {
           const ok = pe.unlocked(ls.id), st = pe.lessonStars(ls), cur = pe.cur && pe.cur.ls === ls;
           return `<button class="ktile${ok ? '' : ' locked'}${cur ? ' cur' : ''}" data-id="${ls.id}" aria-label="${ls.title}" title="${ls.title}">` +
-            (LS_E[ls.id] ? '' : `<span class="n">${'•'.repeat(i + 1)}</span>`) + `<span class="e">${picOf(ls, L)}</span>` +
+            (LS_E[ls.id] ? '' : `<span class="n">${'•'.repeat(i + 1)}</span>`) + `<span class="e${/⚫/.test(picOf(ls, L)) ? ' sm' : ''}">${picOf(ls, L)}</span>` +
             (ls.kind === 'free' ? '' : `<span class="s">${'★'.repeat(st)}<span style="opacity:.25">${'★'.repeat(3 - st)}</span></span>`) + '</button>';
         }).join('') + '</div></div>';
     }).join('');
