@@ -38,7 +38,14 @@ h1{font-size:clamp(30px,5vw,44px);line-height:1.05;letter-spacing:-.02em;font-we
 .blk.w{width:calc(100%/var(--nw) - 4px);height:32px;background:#f3f1ec;color:#141518}
 .blk.b{width:calc(100%/var(--nw)*0.7);height:32px;background:#3a3d45;color:#fff;outline:2px solid #f3f1ec}
 .blk.now{background:var(--felt);color:#fff;outline:none;box-shadow:0 0 0 3px rgba(200,16,46,.35)}
-.lyric{position:absolute;left:8px;top:4px;font-size:12px;color:#c9c6bf;right:10px}
+.lyric{position:absolute;left:8px;top:4px;font-size:12px;color:#c9c6bf;right:10px;z-index:5;pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.kwrap{position:relative}
+.kscroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent;border-radius:10px 10px 0 0}
+.kscroll::-webkit-scrollbar{height:4px}.kscroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:4px}
+.kinner{width:calc(var(--nw) * var(--kw,40px));margin:0 auto}
+.kfade{position:absolute;top:0;bottom:0;width:26px;z-index:6;pointer-events:none;display:grid;place-items:center;color:rgba(255,255,255,.75);font-size:18px;opacity:0;transition:opacity .2s}
+.kfade.l{left:0;background:linear-gradient(90deg,rgba(20,21,24,.55),transparent)}.kfade.r{right:0;background:linear-gradient(270deg,rgba(20,21,24,.55),transparent)}
+.kfade.on{opacity:1}
 .fg{display:grid;place-items:center;width:15px;height:15px;border-radius:50%;background:#141518;color:#fff;font-size:10px;font-style:normal}
 .blk.now .fg{background:#fff;color:var(--felt)}
 .handov{position:absolute;left:0;right:0;top:0;bottom:-66px;pointer-events:none;z-index:3}
@@ -58,6 +65,7 @@ h1{font-size:clamp(30px,5vw,44px);line-height:1.05;letter-spacing:-.02em;font-we
 .wk b{font-size:15px;color:#141518}
 .wk .mc{font-size:11px;color:var(--felt);font-weight:700;margin-bottom:2px}
 .bk{position:absolute;top:0;width:calc(100%/var(--nw)*0.62);height:60%;transform:translateX(-50%);background:linear-gradient(#2e3036,#0d0e10);border-radius:0 0 5px 5px;cursor:pointer;border:0;z-index:2}
+.wk.down{background:#e2ded6}.bk.down{background:linear-gradient(#4a4d55,#1d1e22)}
 .wk.target{background:#ffd9df}.bk.target{background:linear-gradient(#e0405a,#8d0c22)}
 .wk.hit{background:#c9f0dc}.bk.hit{background:linear-gradient(#25a46f,#0c5a3a)}
 .wk.miss{background:#ffc9a8}.bk.miss{background:linear-gradient(#e2833b,#8a4106)}
@@ -149,7 +157,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="wrap">
 <div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 11 版</span></h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 12 版</span></h1>
   <div class="row" style="align-items:center">
     <button class="chip" id="kidsBtn" type="button" title="切到不用识字的儿童页面">🧸 儿童版</button>
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
@@ -162,9 +170,13 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <section>
   <div class="stage" id="stage" style="--nw:12">
     <div class="desk" id="desk" hidden><div id="sheet"></div><div id="sheetMsg"></div></div>
-    <div class="lane" id="lane"><div class="lyric" id="lyric"></div></div>
-    <div class="felt"></div>
-    <div class="kb" id="kb"></div>
+    <div class="kwrap" id="kwrap"><div class="lyric" id="lyric"></div><div class="kfade l" id="kfadeL">‹</div><div class="kfade r" id="kfadeR">›</div>
+      <div class="kscroll" id="kscroll"><div class="kinner" id="kinner">
+        <div class="lane" id="lane"></div>
+        <div class="felt"></div>
+        <div class="kb" id="kb"></div>
+      </div></div>
+    </div>
   </div>
   <div class="prompt" aria-live="polite">
     <div class="say" id="say">先点右边“开始听”</div>
@@ -384,7 +396,7 @@ if (typeof module !== 'undefined') module.exports = { PitchCore };
 <script src="score.js?v=8"></script>
 <script>
 {
-const VER = 11;
+const VER = 12;
 // 儿童版（kids.js）听这些事件：lesson / reset / step / hit / miss / finish
 const emit = (t, d) => { try { window.dispatchEvent(new CustomEvent('pe:' + t, { detail: d || {} })); } catch (e) {} };
 const WHITE = [0,2,4,5,7,9,11];
@@ -392,9 +404,9 @@ const SOL = ['do','','re','','mi','fa','','sol','','la','','si'];
 const NUM = ['1','','2','','3','4','','5','','6','','7'];
 const ABC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const isW = m => WHITE.includes(((m % 12) + 12) % 12);
-// 键盘一直是 12 个白键（3D 手按 12 个键对齐），每课按音域挪窗口：比如拜厄是 C4–G5，儿歌是 F3–C5
-const NW = 12, whites = [];
-let LOW = 53, HIGH = 72, winBase = Score.whiteNo(53);
+// 键盘固定 C2–C7 共 36 个白键（3D 手按这 36 个键对齐）；键宽固定，可以左右滑，横屏能看到更多键，每课自动滚到要弹的地方：比如拜厄是 C4–G5，儿歌是 F3–C5
+const NW = 36, KB_BASE = Score.whiteNo(36), whites = [];
+let LOW = 36, HIGH = 96, winBase = KB_BASE, span = null;
 function setWindow(base) { winBase = base; whites.length = 0; for (let k = 0; k < NW; k++) whites.push(Score.whiteMidi(base + k)); LOW = whites[0]; HIGH = whites[NW - 1]; }
 setWindow(winBase);
 const keyX = m => { if (isW(m)) return (whites.indexOf(m) + 0.5) / NW * 100; return (whites.indexOf(m - 1) + 1) / NW * 100; };
@@ -519,12 +531,35 @@ function makePlan() {
   p.lastT = all.length ? Math.max(...all.map(e => e.t + e.d)) : 0;
   return p;
 }
+// 键盘不再挪窗口，只记下这一课的音域，用来自动滚动
 function fitWindow() {
-  const ev = data.events; if (!ev.length) { setWindow(Score.whiteNo(53)); return; }
-  const lo = Math.min(...ev.map(e => Score.whiteNo(e.m))), hi = Math.max(...ev.map(e => Score.whiteNo(e.m)));
-  let base = Math.min(lo, hi - (NW - 1));
-  for (let k = 0; k <= 2; k++) { const b = base - k; if ((b % 7 === 0 || b % 7 === 3) && b + NW - 1 >= hi) { base = b; break; } }
-  setWindow(base);
+  setWindow(KB_BASE);
+  const ev = data.events; if (!ev.length) { span = null; return; }
+  span = [Math.min(...ev.map(e => e.m)), Math.max(...ev.map(e => e.m))];
+}
+// —— 琴键左右滑：键宽按手机竖屏算一次（12 个白键铺满），转横屏键不变宽，只是露出更多键 ——
+const KW = (() => { const S = Math.min(screen.width || innerWidth, screen.height || innerHeight) || 390; return Math.round(Math.max(24, Math.min(56, (S - 2 * Math.max(0.05 * S, 16) - 24) / 12))); })();
+let scrollKey = '', progScroll = 0;
+const kscroll = () => $('kscroll');
+function keyPx(m) { const kin = $('kinner'); return keyX(m) / 100 * kin.offsetWidth + kin.offsetLeft; }
+function fadeEdges() { const sc = kscroll(); if (!sc) return; $('kfadeL').classList.toggle('on', sc.scrollLeft > 4); $('kfadeR').classList.toggle('on', sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 4); }
+// 让 [a, b]（像素）露出来：放得下这一课的整个音域就把音域居中，否则把这一步居中
+function showRange(a, b, smooth) {
+  const sc = kscroll(), vw = sc.clientWidth, pad = KW * 0.8; if (!vw || sc.scrollWidth <= vw + 1) { fadeEdges(); return; }
+  const L = sc.scrollLeft;
+  if (a - pad >= L && b + pad <= L + vw) { fadeEdges(); return; }
+  let c = (a + b) / 2;
+  if (span) { const sa = keyPx(span[0]) - KW / 2, sb = keyPx(span[1]) + KW / 2; if (sb - sa + 2 * pad <= vw && sa <= a && sb >= b) c = (sa + sb) / 2; }
+  const left = Math.max(0, Math.min(sc.scrollWidth - vw, c - vw / 2));
+  progScroll = performance.now();
+  if (smooth && sc.scrollTo) sc.scrollTo({ left, behavior: 'smooth' }); else sc.scrollLeft = left;
+  setTimeout(fadeEdges, smooth ? 400 : 0);
+}
+function scrollToStep(st) {
+  if (!st) { if (span) showRange(keyPx(span[0]) - KW / 2, keyPx(span[1]) + KW / 2, false); return; }
+  const xs = st.notes.map(n => keyPx(n.m));
+  if (hand.anchor !== null && !(plan && plan.hands === 'L')) { const kin = $('kinner'), w = kin.offsetWidth / NW; xs.push(kin.offsetLeft + hand.anchor * w, kin.offsetLeft + (hand.anchor + 5) * w); }
+  showRange(Math.min(...xs) - KW / 2, Math.max(...xs) + KW / 2, scrollKey !== '');
 }
 
 async function openLesson(id) {
@@ -535,13 +570,14 @@ async function openLesson(id) {
   try { data = await prepare(e.ls); } catch (err) { $('say').textContent = '这一课没加载出来'; $('hint').textContent = err.message + '。检查网络后刷新页面。'; return; }
   if (cur !== e) return;
   opt = Object.assign(defaults(e.ls), store.opts[e.ls.id] || {});
-  fitWindow(); hand.anchor = null; buildKb();
+  fitWindow(); hand.anchor = null; buildKb(); scrollKey = '';
   renderCtl(); reset(); emit('lesson', { id: e.ls.id });
 }
 const saveOpt = () => { store.opts[cur.ls.id] = opt; save(); };
 
 function reset() {
   stopClock(); plan = makePlan();
+  scrollKey = scrollKey ? 'reset' : '';
   idx = 0; okFirst = 0; bad = 0; triedWrong = false; finished = false; t0 = 0; hits = new Set(); beatStats = { on: 0, early: 0, late: 0 };
   $('doneBox').innerHTML = ''; $('fb').textContent = ''; $('fb').className = 'fb'; $('tfb').textContent = ''; $('tfb').className = 'tfb';
   draw(); showSheet(); emit('reset');
@@ -608,7 +644,8 @@ function draw() {
   if (cur.ls.kind === 'free') {
     $('say').innerHTML = '随便弹，看看我听到了什么';
     $('hint').textContent = '一次弹一个键。听到的音会在琴键上亮绿色，右边显示音名和音准。';
-    $('lyric').textContent = ''; $('prog').style.width = '0'; drawHand(null); return;
+    $('lyric').textContent = ''; $('prog').style.width = '0'; drawHand(null);
+    if (scrollKey !== 'free') { showRange(keyPx(60) - KW / 2, keyPx(72) + KW / 2, false); scrollKey = 'free'; } return;
   }
   const S = plan.steps, N = S.length;
   $('prog').style.width = (N ? idx / N * 100 : 0) + '%';
@@ -640,6 +677,7 @@ function draw() {
   $('hint').className = 'hint' + (st.shiftR || st.shiftL ? ' shift' : '');
   if (plan.hands === 'L' && !R.length) drawHand(null);
   else if (st.anchorR !== null && st.anchorR >= 0 && st.anchorR <= NW - 5) drawHand(st.anchorR, R.length ? R[0].f : null); else drawHand(null);
+  const sk = cur.ls.id + ':' + idx; if (sk !== scrollKey) { scrollToStep(st); scrollKey = sk; }
   $('lyric').textContent = st.notes[0].lyric ? plan.steps.slice(Math.max(0, idx - 3), idx).map(s => s.notes[0].lyric || '').join('') + '【' + st.notes[0].lyric + '】' + plan.steps.slice(idx + 1, idx + 5).map(s => s.notes[0].lyric || '').join('') : '';
   // 音块：高度 = 时值；另一只手淡淡地画出来
   const H = lane.clientHeight || 100, BEAT_PX = Math.max(18, (H - 8) / 4), tNow = st.t, tMax = tNow + (H - 6) / BEAT_PX;
@@ -817,7 +855,14 @@ function click(when, strong) {
   o.frequency.value = strong ? 1600 : 1100; g.gain.setValueAtTime(0.0001, when); g.gain.exponentialRampToValueAtTime(strong ? 0.25 : 0.14, when + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
   o.connect(g).connect(c.destination); o.start(when); o.stop(when + 0.06);
 }
-kb.addEventListener('pointerdown', e => { const k = e.target.closest('[data-m]'); if (!k) return; e.preventDefault(); const m = +k.dataset.m; tone(m, 0, 0.6, 0.3, true); onNote(m, 'tap', getCtx().currentTime); });
+const tapKey = k => { const m = +k.dataset.m; tone(m, 0, 0.6, 0.3, true); onNote(m, 'tap', getCtx().currentTime); };
+const downs = new Map(); // 手指按下的键：能滑动时等抬手再算，滑动就不算按键
+kb.addEventListener('pointerdown', e => { const k = e.target.closest('[data-m]'); if (!k) return; e.preventDefault(); const sc = kscroll();
+  if (e.pointerType === 'mouse' || sc.scrollWidth <= sc.clientWidth + 1) return tapKey(k);
+  downs.set(e.pointerId, { k, x: e.clientX, y: e.clientY, sl: sc.scrollLeft }); k.classList.add('down'); });
+kb.addEventListener('pointerup', e => { const d = downs.get(e.pointerId); if (!d) return; downs.delete(e.pointerId); d.k.classList.remove('down');
+  if (Math.abs(e.clientX - d.x) < 12 && Math.abs(kscroll().scrollLeft - d.sl) < 6) tapKey(d.k); });
+kb.addEventListener('pointercancel', e => { const d = downs.get(e.pointerId); if (d) d.k.classList.remove('down'); downs.delete(e.pointerId); });
 kb.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const k = e.target.closest('[data-m]'); if (k) { e.preventDefault(); tone(+k.dataset.m, 0, 0.6, 0.3, true); onNote(+k.dataset.m, 'tap', getCtx().currentTime); } } });
 
 $('demoBtn').onclick = () => {
@@ -945,9 +990,10 @@ $('accChk').onchange = e => { opt.accomp = e.target.checked; saveOpt(); reset();
 const barsChange = () => { let a = +$('fromSel').value, b = +$('toSel').value; if (b < a) { b = a; $('toSel').value = b; } const ls = cur.ls; opt.from = a === (ls.from || data.measures[0].n) ? null : a; opt.to = b === (ls.to || data.measures[data.measures.length - 1].n) ? null : b; saveOpt(); reset(); };
 $('fromSel').onchange = barsChange; $('toSel').onchange = barsChange;
 $('loopChk').onchange = e => { opt.loop = e.target.checked; saveOpt(); };
-addEventListener('resize', () => { if (plan) draw(); });
+addEventListener('resize', () => { if (plan) { scrollKey = scrollKey ? 'resize' : ''; draw(); } fadeEdges(); });
 
-$('stage').style.setProperty('--nw', NW);
+$('stage').style.setProperty('--nw', NW); $('stage').style.setProperty('--kw', KW + 'px');
+kscroll().addEventListener('scroll', fadeEdges, { passive: true });
 $('unlockAll').checked = !!store.unlockAll;
 buildKb();
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) micFail(NO_API);
