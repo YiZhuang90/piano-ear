@@ -157,7 +157,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
 <div class="wrap">
 <div id="errBox" class="notice" hidden style="margin-bottom:14px"></div>
 <header>
-  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 12 版</span></h1>
+  <h1>听音钢琴课 <span class="small" style="font-weight:400;letter-spacing:0">第 13 版</span></h1>
   <div class="row" style="align-items:center">
     <button class="chip" id="kidsBtn" type="button" title="切到不用识字的儿童页面">🧸 儿童版</button>
     <button class="chip" id="micChip" type="button"><span class="dot"></span><span id="micTxt">麦克风未开启</span></button>
@@ -226,6 +226,7 @@ window.addEventListener('unhandledrejection', function (e) { var r = e.reason ||
       <div class="lvl" title="绿条是现在的音量，黑线是门槛"><i id="lvl"></i><b id="gateMark"></b></div>
       <label class="sens"><span class="row" style="justify-content:space-between"><span class="small">麦克风灵敏度</span><span class="small" id="sensTxt">70</span></span>
         <input type="range" id="sensIn" min="0" max="100" step="5" value="70" aria-label="麦克风灵敏度"></label>
+      <div class="crow"><span class="small">识音方式</span><select id="engSel" aria-label="识音方式"><option value="ai">AI 识别（准，和弦也能听，首次要下载约 1 MB）</option><option value="simple">简单识别（只听单音，省电）</option></select></div>
       <p class="small" style="margin:0">轻轻弹一个音，绿条要越过黑线才算听到。弹了没反应就往右拉；没弹却冒出音来，就往左拉。</p>
     </div>
     <details>
@@ -394,9 +395,10 @@ if (typeof module !== 'undefined') module.exports = { PitchCore };
 
 </script>
 <script src="score.js?v=8"></script>
+<script src="nnpitch.js?v=13"></script>
 <script>
 {
-const VER = 12;
+const VER = 13;
 // 儿童版（kids.js）听这些事件：lesson / reset / step / hit / miss / finish
 const emit = (t, d) => { try { window.dispatchEvent(new CustomEvent('pe:' + t, { detail: d || {} })); } catch (e) {} };
 const WHITE = [0,2,4,5,7,9,11];
@@ -508,6 +510,7 @@ async function prepare(ls) {
 // —— 练习设置（每课记住） ——
 let data = null, plan = null, opt = null;
 let idx = 0, okFirst = 0, bad = 0, triedWrong = false, finished = false, t0 = 0, hits = new Set();
+let nn = null, nnOn = false; // AI 识别（见下面“麦克风”）
 let beatStats = { on: 0, early: 0, late: 0 }, clock = null; // 跟拍模式
 const defaults = ls => ({ hands: ls.hands === 'RL' ? 'R' : (ls.hands || 'R'), mode: 'wait', tempo: ls.kind === 'beyer' ? 60 : 100, staff: (cur && cur.L.staff) || 'off', accomp: !!ls.accomp, from: null, to: null, loop: false });
 
@@ -632,6 +635,7 @@ const whiteDist = (a, b) => { let n = 0; const s = b > a ? 1 : -1; for (let m = 
 
 function draw() {
   clearMarks();
+  if (nn) nn.expect(cur && cur.ls.kind !== 'free' && plan && !finished && plan.steps[idx] ? plan.steps[idx].notes.map(n => n.m) : []);
   $('sOk').textContent = okFirst; $('sBad').textContent = bad;
   const b = (store.best[cur.ls.id] || {})[plan ? plan.hands : 'R']; $('sBest').textContent = b != null ? b + '%' : '–';
   lane.querySelectorAll('.blk,.mline').forEach(el => el.remove());
@@ -692,21 +696,24 @@ function draw() {
 
 // —— 弹对、弹错 ——
 let autoHeard = [];
-function onNote(m, src, at) {
+let prevNeed = [], prevAt = -1e9;
+function onNote(m, src, at, how) {
   $('heard').textContent = nm(m, 'abc') + ' · ' + nm(m, 'sol');
   if (!cur || cur.ls.kind === 'free' || finished || !plan || !plan.steps.length) { flash(m, 'hit'); return; }
   const st = plan.steps[idx], need = st.notes.map(n => n.m);
   if (src === 'mic' && window.__peGate && window.__peGate(m, need)) return; // 儿童版自己在说话或放音效
+  // AI 识别：上一步的音还在响（刚弹完就进了下一步），不算错
+  if (how === 'nn' && !need.includes(m) && prevNeed.includes(m) && at - prevAt < 0.15) return;
   if (src === 'mic' && !need.includes(m) && autoHeard.some(a => ((a.m - m) % 12 === 0) && at >= a.from - 0.06 && at <= a.to)) return; // 是网页自己弹的伴奏
   if (!t0) t0 = performance.now();
   const fb = $('fb');
   let ok = need.includes(m);
-  if (!ok && src === 'mic' && need.length > 1 && need.some(x => (x - m) % 12 === 0)) ok = true; // 和音/八度：麦克风听到其中一个就算
+  if (!ok && src === 'mic' && how !== 'nn' && need.length > 1 && need.some(x => (x - m) % 12 === 0)) ok = true; // 和音/八度：麦克风听到其中一个就算
   if (ok) {
     const nt = st.notes.find(n => n.m === m) || st.notes[0];
     flash(m, 'hit', nt.hand); emit('hit', { m, src });
     hits.add(m);
-    const complete = st.any || src === 'mic' || need.every(x => hits.has(x));
+    const complete = st.any || (src === 'mic' && how !== 'nn') || need.every(x => hits.has(x)); // AI 能听和弦：要全部按到
     if (!complete) { fb.className = 'fb good'; fb.textContent = '对，' + need.filter(x => !hits.has(x)).map(x => fullName(x)).join('、') + ' 也要按。'; draw(); return; }
     stepDone(st, at);
   } else {
@@ -722,7 +729,7 @@ function onNote(m, src, at) {
 function stepDone(st, at) {
   const c = getCtx(), now = at || c.currentTime, fb = $('fb');
   if (!triedWrong) okFirst++;
-  triedWrong = false; hits = new Set();
+  triedWrong = false; hits = new Set(); prevNeed = st.notes.map(n => n.m); prevAt = now;
   if (opt.mode === 'beat') judgeBeat(st, now);
   playAuto(st.t, idx + 1 < plan.steps.length ? plan.steps[idx + 1].t : plan.lastT, now);
   idx++;
@@ -873,7 +880,36 @@ $('demoBtn').onclick = () => {
 };
 
 // —— 麦克风 ——
-let det = null, an = null, buf = null, listening = false;
+let det = null, an = null, buf = null, listening = false, micSrc = null;
+let engine = 'ai';
+try { engine = localStorage.getItem('pianoEarEngine') || 'ai'; } catch (e) {}
+// AI 识别（Spotify Basic Pitch，见 model/NOTICE.md）。加载不成或手机太慢就继续用简单识别
+function startNN(c, src) {
+  if (engine !== 'ai' || !window.PeNN || nn) return;
+  micState('on', '正在听（AI 模型加载中…）');
+  const me = PeNN.NNListener(c, src, { sens: sens / 100, onFail: why => nnFail(me, why) });
+  nn = me;
+  me.on(ev => { if (nn !== me || c.currentTime < muteUntil || ev.t < muteUntil) return; onNote(ev.midi, 'mic', ev.t, 'nn'); });
+  me.start().then(() => {
+    if (nn !== me) return me.stop();
+    nnOn = true; draw(); micState('on', '正在听（AI 识别）');
+    const s = me.stats; diag('成功：拿到麦克风，AI 识别已开（' + s.backend + '，加载 ' + s.loadMs + ' 毫秒，每次计算约 ' + Math.round(s.runMs) + ' 毫秒）');
+  }, e => nnFail(me, (e && e.message) || '加载失败'));
+}
+function nnFail(me, why) {
+  if (nn !== me) return;
+  try { me.stop(); } catch (e) {}
+  nn = null; nnOn = false;
+  if (listening) micState('on', '正在听（简单识别）');
+  diag('AI 识别没开成，改用简单识别：' + why);
+}
+function stopNN() { if (nn) { try { nn.stop(); } catch (e) {} } nn = null; nnOn = false; }
+function setEngine(v) {
+  engine = v; $('engSel').value = v;
+  try { localStorage.setItem('pianoEarEngine', v); } catch (e) {}
+  if (!listening) return;
+  if (v === 'ai') startNN(getCtx(), micSrc); else { stopNN(); micState('on', '正在听（简单识别）'); }
+}
 function micState(cls, txt) { const c = $('micChip'); c.className = 'chip ' + cls; $('micTxt').textContent = txt; }
 let asking = false;
 const IN_APP = /MicroMessenger|WeChat|FBAN|FBAV|Instagram|Line\/|Claude/i.test(navigator.userAgent);
@@ -900,12 +936,13 @@ function startMic() {
       const src = c.createMediaStreamSource(stream); an = c.createAnalyser(); an.fftSize = 2048; src.connect(an);
       buf = new Float32Array(an.fftSize);
       det = PitchCore(c.sampleRate, { refA4: refA4, sens: sens / 100 });
-      det.on(ev => { if (c.currentTime < muteUntil) return; recent.push(ev.cents); if (recent.length > 8) recent.shift(); showCents(ev.cents); onNote(ev.midi, 'mic', ev.t); });
-      listening = true; $('micNote').hidden = true; micState('on', '正在听');
+      det.on(ev => { if (c.currentTime < muteUntil) return; recent.push(ev.cents); if (recent.length > 8) recent.shift(); showCents(ev.cents); if (!nnOn) onNote(ev.midi, 'mic', ev.t); else if (cur && cur.ls.kind === 'free') $('heard').textContent = nm(ev.midi, 'abc') + ' · ' + nm(ev.midi, 'sol'); });
+      listening = true; micSrc = src; $('micNote').hidden = true; micState('on', engine === 'ai' ? '正在听' : '正在听（简单识别）');
       diag('成功：拿到麦克风，声音状态 ' + c.state + '，采样率 ' + c.sampleRate);
       $('startBtn').hidden = true;
       if (c.state !== 'running') showNote('麦克风开了，但声音还没启动。请再点一下屏幕上任意一个琴键。');
-      stream.getAudioTracks().forEach(t => t.addEventListener('ended', () => { listening = false; $('startBtn').hidden = false; micFail('麦克风被关掉了（可能是来电或切到别的 App）。点“开始听”重新打开。'); }));
+      startNN(c, src);
+      stream.getAudioTracks().forEach(t => t.addEventListener('ended', () => { listening = false; stopNN(); $('startBtn').hidden = false; micFail('麦克风被关掉了（可能是来电或切到别的 App）。点“开始听”重新打开。'); }));
       loop();
     })
     .catch(e => {
@@ -948,9 +985,25 @@ try { const v = localStorage.getItem('pianoEarSens'); if (v !== null && !isNaN(+
 function setSens(v) {
   sens = v; $('sensIn').value = v; $('sensTxt').textContent = v + (v === 70 ? '（默认）' : '');
   if (det) det.setSens(v / 100);
+  if (nn) nn.setSens(v / 100);
   try { localStorage.setItem('pianoEarSens', String(v)); } catch (e) {}
 }
 $('sensIn').oninput = e => setSens(+e.target.value);
+$('engSel').value = engine; $('engSel').onchange = e => setEngine(e.target.value);
+// 地址加 ?nntest=1：不用麦克风，用合成的琴声测一下 AI 识别在这台手机上能不能跑、多快
+if (/[?&]nntest=1/.test(location.search) && window.PeNN) (async () => {
+  const d = $('diag'), say = t => { d.textContent = t; document.title = t.slice(0, 60); };
+  say('AI 自测：加载中…');
+  try {
+    const p = await PeNN.probe();
+    const notes = [{ m: 60, t: 0.8, g: 0.15 }, { m: 48, t: 1.8, g: 0.15 }, { m: 64, t: 1.8, g: 0.15 }, { m: 67, t: 1.8, g: 0.15 }, { m: 69, t: 2.8, g: 0.02 }, { m: 72, t: 3.8, g: 0.006 }];
+    const exp = t => t < 1.75 ? [60] : t < 2.75 ? [48, 64, 67] : t < 3.75 ? [69] : [72];
+    const r = await PeNN.runOffline(p, PeNN.synth(5, notes), 0.1, exp);
+    const got = r.evs.map(e => e.midi), want = notes.map(n => n.m);
+    const miss = want.filter(m => !got.includes(m)), extra = got.filter(m => !want.includes(m));
+    say('AI 自测：' + p.stats.backend + '，加载 ' + p.stats.loadMs + ' 毫秒，每次计算 ' + Math.round(r.runMs) + ' 毫秒；6 个音听到 ' + (6 - miss.length) + ' 个' + (extra.length ? '，多听了 ' + extra.length + ' 个' : '') + '（' + r.evs.map(e => nm(e.midi, 'abc')).join(' ') + '）');
+  } catch (e) { say('AI 自测失败：' + ((e && e.message) || e)); }
+})();
 setSens(sens);
 function showCents(c) {
   $('needle').style.left = (50 + Math.max(-50, Math.min(50, c))) + '%';
